@@ -1,2 +1,2 @@
 # enhancements
-This repository will contain enhancement proposals for submariner-io projects
+This repository contains enhancement proposals for submariner-io projects

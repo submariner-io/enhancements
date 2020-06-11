@@ -37,17 +37,17 @@ worker2    passive         0/0
     
 ```bash
 subctl show connections  
-GATEWAY  CLUSTER    REMOTE-IP    DRIVER     SUBNETS                         STATUS  
-worker1  cluster2   172.17.0.10  libreswan  100.93.0.0/16,  10.243.0.0/16   connected  
-worker1  cluster3   172.17.0.11  libreswan  100.94.0.0/16,  10.244.0.0/16   connected
+GATEWAY  CLUSTER    REMOTE-IP    CABLE-DRIVER     SUBNETS                         STATUS  
+worker1  cluster2   172.17.0.10  libreswan        100.93.0.0/16,  10.243.0.0/16   connected  
+worker1  cluster3   172.17.0.11  libreswan        100.94.0.0/16,  10.244.0.0/16   connected
 ```
   
   
 ```bash 
 subctl show endpoints  
-  Cable driver: strongswan  
-  Cluster ID: cluster3  
-  Endpoint IP: <public IP> (172.17.0.10) 
+CLUSTER-ID    IP            PUBLIC IP     CABLE-DRIVER  LOCAL
+cluster3      172.17.0.10                 strongswan    Yes
+cluster2      172.17.0.5                  libreswan     No
   ```
 
 
@@ -59,35 +59,37 @@ Discovered network details:
   Cluster CIDRs: [10.242.0.0/16]    
   GlobalCIDR:    [<>]  
 
-Cable driver: strongswan  
-Cluster ID: cluster3  
-Endpoint IP: <public IP> (172.17.0.10) 
+CLUSTER-ID    IP            PUBLIC IP     CABLE-DRIVER  LOCAL
+cluster3      172.17.0.10                 strongswan    Yes
+cluster2      172.17.0.5                  libreswan     No
 
 NODE       HA-STATUS       CONNECTIONS    SUMMARY  
 worker1    active          3/3            All connections OK  
 worker2    passive         0/0                                
 
-GATEWAY  CLUSTER    REMOTE-IP    DRIVER     SUBNETS                         STATUS  
-worker1  cluster2   172.17.0.10  libreswan  100.93.0.0/16,  10.243.0.0/16   connected  
-worker1  cluster3   172.17.0.11  libreswan  100.94.0.0/16,  10.244.0.0/16   connected
+GATEWAY  CLUSTER    REMOTE-IP    CABLE-DRIVER     SUBNETS                         STATUS  
+worker1  cluster2   172.17.0.10  libreswan        100.93.0.0/16,  10.243.0.0/16   connected  
+worker1  cluster3   172.17.0.11  libreswan        100.94.0.0/16,  10.244.0.0/16   connected
 
-COMPONENT VERSION
-submariner-operator v0.4.0
-submariner-engine v0.4.0
-submariner-routeagent v0.4.0
-submariner-globalnet v0.4.0
-lighthouse-agent v0.4.0
+COMPONENT             VERSION
+submariner-operator   0.4.0
+submariner-engine     0.4.0
+submariner-routeagent 0.4.0
+submariner-globalnet  0.4.0
+lighthouse-agent      0.4.0
+lighthouse-coredns    0.4.0
    ```
    
       
 ```bash   
 subctl show versions 
-COMPONENT VERSION
-submariner-operator v0.4.0
-submariner-engine v0.4.0
-submariner-routeagent v0.4.0
-submariner-globalnet v0.4.0
-lighthouse-agent v0.4.0
+COMPONENT             VERSION
+submariner-operator   0.4.0
+submariner-engine     0.4.0
+submariner-routeagent 0.4.0
+submariner-globalnet  0.4.0
+lighthouse-agent      0.4.0
+lighthouse-coredns    0.4.0
 ```
 
 

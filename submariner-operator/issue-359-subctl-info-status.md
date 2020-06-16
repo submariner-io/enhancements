@@ -26,8 +26,6 @@ subctl show networks
          GlobalCIDR:    [<>] 
 ```
 
-
-
 ``` bash 
 subctl show gateways  
 NODE       HA-STATUS       CONNECTIONS    SUMMARY  
@@ -42,14 +40,23 @@ worker1  cluster2   172.17.0.10  libreswan        100.93.0.0/16,  10.243.0.0/16 
 worker1  cluster3   172.17.0.11  libreswan        100.94.0.0/16,  10.244.0.0/16   connected
 ```
   
-  
 ```bash 
 subctl show endpoints  
-CLUSTER-ID    IP            PUBLIC IP     CABLE-DRIVER  LOCAL
-cluster3      172.17.0.10                 strongswan    Yes
-cluster2      172.17.0.5                  libreswan     No
+CLUSTER-ID    ENDPOINT-IP     PUBLIC-IP     CABLE-DRIVER  LOCAL
+cluster3      172.17.0.10                   libreswan     Yes
+cluster2      172.17.0.5                    libreswan     No
   ```
 
+```bash   
+subctl show versions 
+COMPONENT             VERSION
+submariner-operator   0.4.0
+submariner-engine     0.4.0
+submariner-routeagent 0.4.0
+submariner-globalnet  0.4.0
+lighthouse-agent      0.4.0
+lighthouse-coredns    0.4.0
+```
 
 ```bash
 subctl show all  
@@ -59,8 +66,8 @@ Discovered network details:
   Cluster CIDRs: [10.242.0.0/16]    
   GlobalCIDR:    [<>]  
 
-CLUSTER-ID    IP            PUBLIC IP     CABLE-DRIVER  LOCAL
-cluster3      172.17.0.10                 strongswan    Yes
+CLUSTER-ID    ENDPOINT-IP   PUBLIC-IP     CABLE-DRIVER  LOCAL
+cluster3      172.17.0.10                 libreswan     Yes
 cluster2      172.17.0.5                  libreswan     No
 
 NODE       HA-STATUS       CONNECTIONS    SUMMARY  
@@ -79,17 +86,3 @@ submariner-globalnet  0.4.0
 lighthouse-agent      0.4.0
 lighthouse-coredns    0.4.0
    ```
-   
-      
-```bash   
-subctl show versions 
-COMPONENT             VERSION
-submariner-operator   0.4.0
-submariner-engine     0.4.0
-submariner-routeagent 0.4.0
-submariner-globalnet  0.4.0
-lighthouse-agent      0.4.0
-lighthouse-coredns    0.4.0
-```
-
-

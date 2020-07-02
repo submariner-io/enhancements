@@ -51,11 +51,8 @@ cluster2      172.17.0.5                    libreswan     remote
 subctl show versions 
 COMPONENT             VERSION
 submariner-operator   0.4.0
-submariner-engine     0.4.0
-submariner-routeagent 0.4.0
-submariner-globalnet  0.4.0
-lighthouse-agent      0.4.0
-lighthouse-coredns    0.4.0
+submariner            0.4.0
+service-discovery     0.4.0
 ```
 
 ```bash

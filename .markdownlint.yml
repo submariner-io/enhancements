@@ -10,3 +10,6 @@ line-length:
 no-inline-html:
   allowed_elements:
     - span
+
+no-duplicate-header:
+  allow_different_nesting: true

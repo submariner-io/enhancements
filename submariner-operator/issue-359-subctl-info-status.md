@@ -77,9 +77,6 @@ worker1  cluster3   172.17.0.11  libreswan        100.94.0.0/16,  10.244.0.0/16 
 
 COMPONENT             VERSION
 submariner-operator   0.4.0
-submariner-engine     0.4.0
-submariner-routeagent 0.4.0
-submariner-globalnet  0.4.0
-lighthouse-agent      0.4.0
-lighthouse-coredns    0.4.0
+submariner            0.4.0
+service-discovery     0.4.0
    ```

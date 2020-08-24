@@ -22,7 +22,8 @@ If node labels are not specified, the following tests will be run by default:
 
 In case server-options are not included, the command will use defaults.
 
-*Note* - In phase 1 of the implementations there will be no additional params other then `<kubeconfing1>` and `<kubeconfig2>`
+**Note** - In phase 1 of the implementations there will be no additional params other then `<kubeconfing1>` and 
+`<kubeconfig2>` and only default tests will be performed.
 
 #### Backend tools and params
 
@@ -44,13 +45,13 @@ The backend for throughput tests will be iperf. The default params that will be 
 
 #### Source code location
 
-Source code should go into Submariner.   
+Source code should go into `submariner-operator`.   
 There is going to be a dependency on the nettest image from Shipyard, which will need to have the necessary tools.
 
 
 ### Subctl command
 
 ```
-subctl test throughput <kubeconfig1> <kubeconfig2>
-subctl test latency <kubeconfig1> <kubeconfig2>
+subctl benchmark throughput <kubeconfig1> <kubeconfig2>
+subctl benchmark latency <kubeconfig1> <kubeconfig2>
 ```

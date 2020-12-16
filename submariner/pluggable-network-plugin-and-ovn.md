@@ -16,7 +16,7 @@ Create `submariner-network-plugin-sync` which will be conditionally deployed by 
 `submariner-operator` for network plugins which require it. In the case of OVN it will be
 the microservice responsible for synchronizing state with the OVN NBDB. Another example
 of network-plugin which could make use of this service in the future would be Calico for
-automatic [handling of the IPPool entries](https://submariner.io/deployment/calico/)
+automatic [handling of the IPPool entries](https://submariner.io/operations/deployment/calico/)
 
 Re-architect Submariner route-agent in a way such that different network-plugin
 implementations can be supported. The re-architecture should create a re-usable library

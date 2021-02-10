@@ -29,20 +29,30 @@ connectivity as well as Headless Services are not supported.
 
 This enhancement proposes the following changes to make Globalnet implementation scale better.
 
-1. By default, every cluster will be assigned a single globalIp which will be used as egress IP
-   for any cross-cluster communication.
-2. Provision to allocate a globalIp at the namespace/project level which takes precedence over
-   the globalIp allocated to the cluster.
-3. Provision to allocate a globalIp to a Pod (or a set of Pods) which has higher precedence
+Egress traffic:
+
+1. By default, every cluster will be assigned two globalIps which will be used as egress IPs
+   for any cross-cluster communication. We are allocating two globalIPs at the cluster level
+   to avoid ephermeral port exhaustion issues.
+2. Provision to allocate a single globalIp at the namespace/project level which takes precedence
+   over the globalIp allocated to the cluster.
+3. Provision to allocate a globalIp to a Pod (or a set of Pods) which has highest precedence
    over globalIPs at namespace level. If there are multiple policies, users can specify a priority
    field for each of the policy.
+
+Ingress traffic:
+
 4. Instead of annotating every ClusterIP Service in the cluster, only exported Services will be
    annotated with a globalIp.
 5. For Headless Services, necessary ingress rules will be programmed to support connectivity to
    the backend Pods. In a Headless Service use-case, every backend Pod will be annotated with
-   a unique globalIP and the same globalIP will be used for both Ingress as-well-as Egress.
-   globalIPs allocated for Pods backed by Headless Services will have highest priority over other
-   egress policies.
+   a unique globalIP as an Ingress IP. Clients can discover the associated globalIPs using Lighthouse
+   and can connect to the globalIP assigned to the backend pods.
+   For Pods backed by Headless Services, if the user does not explicitly request a globalIP using
+   GlobalnetEgressIP with PodSelector that matches those Pods, the same globalIP assigned to the
+   Pods will be used for both Ingress as-well-as Egress. However, if user creates a GlobalnetEgressIP
+   with PodSelector that matches the backend pods of Headless Service, the globalIP assigned for
+   the PodSelector takes precedence over individual Pod globalIPs as EgressIP.
 
 ![GlobalnetTopology](./images/globalnet-topology.png)
 
@@ -55,7 +65,8 @@ Cluster, the external application will see that traffic is coming with a globalI
 assigned either at the Cluster level, or namespace level, or the one requested by the user
 at Pod level. This asynchronous behavior will be analogous to the behavior seen with standard
 K8s applications when they talk to any Services. Applications desiring to have the same IPaddress
-for both ingress and egress traffic can create Headless Services in front of them.
+for both ingress and egress traffic can create Headless Services in front of them and should
+avoid requesting explicit globalIP with podSelectors that match Headless Service backend Pods.
 
 The proposal has its own set of Pros and Cons.
 
@@ -92,25 +103,24 @@ type EgressIPSpec struct {
     // Selects the pods to which the GlobalnetEgressIP will be applied.
     // If multiple pods match the selector the same egressIP will be used for all those pods.
     // +optional
-    PodSelector PodSelectorSpec `json:"podSelector,omitempty"`
+    Selector SelectorSpec `json:"selector,omitempty"`
 
     // Clients can request a specific globalIP to be allocated. If the requested
     // globalIP is part of globalCIDR of the Cluster and is not allocated to other
     // K8s objects, then it will be allocated, otherwise creation of the CRD will fail.
     // Valid values are empty string (""), or a valid IP address from the globalCIDR of
     // the Cluster. This field cannot be changed through updates.
-    GlobalIP    string          `json:"private_ip"`
+    GlobalIP  string      `json:"global_ip"`
 }
 
-type PodSelectorSpec struct {
-    // MatchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
-    // map is equivalent to an element of matchExpressions, whose key field is "key", the
-    // operator is "In", and the values array contains only "value". The requirements are ANDed.
-    MatchLabels map[string]string `json:"matchLabels"`
+type SelectorSpec struct {
+    // Selects the pods to which this GlobalnetEgressIP object applies. The allocated
+	// global_ip will be used for all the Pods selected by this field.
+    PodSelector metav1.LabelSelector `json:"podSelector"`
 
     // Associated priority to be used for the selected pods.
-    // Its value should be between 0 (lowest) and 1000 (highest) inclusive.
-    // When this value is omitted, the default value of 0 is used.
+    // Its value should be between 1 (lowest) and 1000 (highest) inclusive.
+    // When this value is omitted, the default value of 1 is used.
     // +optional
     Priority    int32 `json:"priority,omitempty"`
 }
@@ -153,10 +163,11 @@ type PodSelectorSpec struct {
      namespace: myproject
    spec:
      globalIP: (optional)
-     podSelector:
-       matchLabels:
-         role: db
-       priority: 100  
+     selector:
+       podSelector:
+         matchLabels:
+           role: db
+       priority: 100 (optional) 
 ```
 
 4.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
@@ -164,16 +175,35 @@ type PodSelectorSpec struct {
 
   To achieve this, user can create a Headless Service (backed by a Deployment or StatefulSets) and
   Globalnet will ensure that all the backend Pods that belong to the Headless Service are assigned
-  a globalIP which can be used both for ingress as well as egress.
+  a globalIP. User is also expected **not** to create any GlobalnetEgressIP object which selects the
+  backendPods that match the Headless Service.
 
-```bash
-   kubectl -n default create deployment nginx --image=nginxinc/nginx-unprivileged:stable-alpine
-   kubectl -n default expose deployment nginx --port=8080 --cluster-ip=None
-   subctl export service --namespace default nginx
+![GlobalnetTopology](./images/globalnet-headless-svc.png)
+
+  In the above example, each of the http pods will get its own globalIP which can be used for
+  both ingress and egress communication.
+
+  However, if the user wants egress traffic from the http Pods to carry a unique globalIP,
+  its possible by explicitly requesting a GlobalnetEgressIP with PodSelectors matching Headless
+  Service Pods as shown below.
+
+```yaml
+   apiVersion: submariner.io/v1alpha1
+   kind: GlobalnetEgressIP
+   metadata:
+     name: http-pods
+     namespace: myproject
+   spec:
+     globalIP: (optional)
+     selector:
+       podSelector:
+         matchLabels:
+           app: http
+   status:
+     globalIP: 169.254.0.100
 ```
 
-  In the above example, each of the nginx pod will get its own globalIP which can be used for
-  both ingress and egress communication.
+![GlobalnetTopology](./images/globalnet-svc.png)
 
 ## Alternatives
 

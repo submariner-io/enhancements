@@ -37,9 +37,9 @@ Egress traffic:
 * Provision to allocate a set of globalIPs at the namespace/project level which takes precedence
   over the globalIPs allocated to the cluster. All Pods in the namespace will use the same globalIPs
   as EgressIPs.
-* Provision to allocate globalIPs to a Pod (or a set of Pods) from the selected namespaces.
-  Such Pods will use globalIPs that take precedence over any globalIPs allocated at the default
-  namespace level.
+* Provision to allocate globalIPs to a Pod (or a set of Pods) from the selected namespaces or
+  from any namespace. Such Pods will use globalIPs that take precedence over any globalIPs allocated
+  at the default namespace level.
 
 Ingress traffic:
 
@@ -116,13 +116,15 @@ type EgressIPSpec struct {
     GlobalIPs  []string `json:"globalIPs,omitempty"`
 
     // Selects the Namespaces to which this GlobalnetEgressIP object applies.
-    // This field is mandatory.
-    NamespaceSelector metav1.LabelSelector `json:"namespaceSelector"`
+    // +optional
+    NamespaceSelector metav1.LabelSelector `json:"namespaceSelector,omitempty"`
 
     // Selects the pods whose label match the definition. This is an optional field and
     // in case it is not set, it results in all the Pods selected from the NamespaceSelector.
     // In case it is set, its intersected with NamespaceSelector, and only Pods that match the
     // PodSelector and present in the NamespaceSelector will have the GlobalIPs as EgressIPs.
+    // Either namespaceSelector or podSelector have to be specified. If both are omitted,
+    // its considered as an error.
     // +optional
     PodSelector metav1.LabelSelector `json:"podSelector,omitempty"`
 }
@@ -138,6 +140,10 @@ type EgressIPStatus struct {
     Pods []string `json:"pods"`
 }
 ```
+
+Creation of GlobalnetEgressIP object will be controlled via a ClusterRole and only users having
+the necessary role will be able to create the objects. The GlobalnetEgressIP object can be
+created in any namespace with selectors that match any other namespaces.
 
 ### User Stories
 
@@ -197,7 +203,7 @@ To achieve this, one can apply the following CRD.
    kind: GlobalnetEgressIP
    metadata:
      name: db-pods
-     namespace: myproject
+     namespace: ns1
    spec:
      namespaceSelector:
        matchLabels:
@@ -207,7 +213,7 @@ To achieve this, one can apply the following CRD.
            role: db
 ```
 
-4.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
+5.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
   to use a unique globalIP both as ingress and egressIP for cross-cluster communication.
 
   To achieve this, user can create a Headless Service (backed by a Deployment or StatefulSets) and
@@ -215,7 +221,7 @@ To achieve this, one can apply the following CRD.
   a globalIP. User is also expected **not** to create any GlobalnetEgressIP object which selects the
   backendPods that match the Headless Service.
 
-![GlobalnetTopology](./images/globalnet-headless-svc.png)
+![HeadlessService](./images/globalnet-headless-svc.png)
 
   In the above example, each of the http pods will get its own globalIP which can be used for
   both ingress and egress communication.
@@ -242,7 +248,7 @@ To achieve this, one can apply the following CRD.
       - 169.254.0.100
 ```
 
-![GlobalnetTopology](./images/globalnet-svc.png)
+![Headless Service with EgressIP](./images/globalnet-svc.png)
 
 ## Alternatives
 
@@ -254,14 +260,17 @@ Clusters with non-overlapping CIDRs and use Vanilla Submariner instead of Global
 
 ## Work items
 
-1. Support Globalnet EgressIPs at the cluster level and program necessary egress rules.
-2. Support Globalnet EgressIPs at namespace level which takes precedence over
+1. Support creation of GlobalnetEgressIP CRD and the associated Cluster Roles.
+2. Provide configuration parameter either via ConfigMap or Env variable to specify
+   the number of default GlobalIPs that have to be allocated at cluster level.
+3. Support Globalnet EgressIPs at the cluster level and program necessary egress rules.
+4. Support Globalnet EgressIPs at namespace level which takes precedence over
    globalIPs at cluster level.
-3. Support Globalnet EgressIPs to Pods (or set of Pods) which has the highest precedence.
-4. Annotate only exported Services instead of annotating all Services.
-5. Support Headless Services and program ingress/egress rules for the backend Pods.
-6. Avoid dependency on the iptable chains programmed by IPtables kube-proxy driver.
-7. Implement necessary unit tests for each of the use-cases.
-8. Implement necessary e2e tests to validate various use-cases.
-9. Update documentation.
-10. Support upgrade from 0.8 release to the newer implementation.
+5. Support Globalnet EgressIPs to Pods (or set of Pods) which has the highest precedence.
+6. Annotate only exported Services instead of annotating all Services.
+7. Support Headless Services and program ingress/egress rules for the backend Pods.
+8. Avoid dependency on the iptable chains programmed by IPtables kube-proxy driver.
+9. Implement necessary unit tests for each of the use-cases.
+10. Implement necessary e2e tests to validate various use-cases.
+11. Update documentation.
+12. Support upgrade from 0.8 release to the newer implementation.

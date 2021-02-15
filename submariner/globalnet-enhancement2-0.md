@@ -116,6 +116,10 @@ type EgressIPSpec struct {
     GlobalIPs  []string `json:"globalIPs,omitempty"`
 
     // Selects the Namespaces to which this GlobalnetEgressIP object applies.
+    // If an empty namespaceSelector: {} is configured, it selects all the Pods in all namespaces.
+    // On the other hand, if you omit specifying namespaceSelector, it does not select any
+    // namespaces and selects only Pods from the namespace where the GlobalnetEgressIP is
+    // deployed to.
     // +optional
     NamespaceSelector metav1.LabelSelector `json:"namespaceSelector,omitempty"`
 
@@ -125,6 +129,8 @@ type EgressIPSpec struct {
     // PodSelector and present in the NamespaceSelector will have the GlobalIPs as EgressIPs.
     // Either namespaceSelector or podSelector have to be specified. If both are omitted,
     // its considered as an error.
+    // When a Pod or Namespace matches multiple GlobalnetEgressIP objects, there is no guarantee
+    // which of the globalIP address that are assigned to GlobalnetEgressIP will be used.
     // +optional
     PodSelector metav1.LabelSelector `json:"podSelector,omitempty"`
 }

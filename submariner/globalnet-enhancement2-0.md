@@ -71,11 +71,20 @@ avoid requesting explicit globalIP that match Headless Service backend Pods.
 
 The proposal has its own set of Pros and Cons.
 
-## Pros
+### Pros
 
 Since we will be annotating only select K8s objects with globalIP, it will help in improved scalability.
 Also, this translates to fewer iptable rules on the active Gateway node of the cluster which will
 improve the overall performance of the solution.
+
+### Cons
+
+A limitation with the proposed approach is that we will lose the unique identity for **every**
+Pod which is supported today. For users that intend to use Network Policies across Clusters or
+for debugging purposes, this can be mitigated by creating the necessary GlobalnetEgressIP CRDs
+which create unique globalIPs at the Namespace/Pod level.
+
+### Caveats
 
 In the current implementation, when a client Pod is scheduled, until it's annotated with a globalIP,
 and the corresponding egress rules are programmed on the node, it was not able to communicate with
@@ -83,12 +92,7 @@ remote Services. This was creating some issues in-terms of user-experience. In t
 have a globalIP at the cluster level, a Pod can communicate with remote Services right away which
 will be closer to the Vanilla Submariner experience.
 
-## Cons
-
-A limitation with the proposed approach is that we will lose the unique identity for **every**
-Pod which is supported today. For users that intend to use Network Policies across Clusters or
-for debugging purposes, this can be mitigated by creating the necessary GlobalnetEgressIP CRDs
-which create unique globalIPs at the Namespace/Pod level.
+## Design Details
 
 The following CRD is proposed to support the new design.
 
@@ -150,6 +154,13 @@ type EgressIPStatus struct {
 Creation of GlobalnetEgressIP object will be controlled via a ClusterRole and only users having
 the necessary role will be able to create the objects. The GlobalnetEgressIP object can be
 created in any namespace with selectors that match any other namespaces.
+
+### Backward Compatibility
+
+Inorder to support the newer implementation, a combination of ipSets with multiple IPTable chains
+will be used. Also, we will require two annotations, one for ingressGlobalIP and the other for
+egressGlobalIP. Because of this, backward compatibility cannot be maintained with the existing
+implementation of Globalnet.
 
 ### User Stories
 

@@ -139,7 +139,23 @@ type EgressIPSpec struct {
     PodSelector metav1.LabelSelector `json:"podSelector,omitempty"`
 }
 
+const (
+    // GlobalnetEgressIPSuccess means that Globalnet was able to successfully
+    // allocate the GlobalIP as requested in GlobalnetEgressIP object.
+    GlobalnetEgressIPSuccess GlobalnetEgressIPStatus = "Success"
+
+    // GlobalnetEgressIPError means that Globalnet was unable to allocate the
+    // GlobalIP for the requested GlobalnetEgressIP object.
+    GlobalnetEgressIPError GlobalnetEgressIPStatus = "Error"
+)
+
 type EgressIPStatus struct {
+    // Status is one of {"Success", "Error"}
+    Status GlobalnetEgressIPStatus `json:"status,omitempty"`
+
+    // +optional
+    Message *string `json:"message,omitempty"`
+
     // The list of GlobalIPs assigned via this GlobalnetEgressIP object.
     GlobalIPs []string `json:"globalIPs"`
 

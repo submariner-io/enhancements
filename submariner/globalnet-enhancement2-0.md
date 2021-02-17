@@ -55,6 +55,10 @@ Ingress traffic:
   or the backend pods of Headless Service, the globalIP assigned via GlobalnetEgressIP takes
   precedence over individual Pod globalIPs as EgressIP.
 
+Both EgressIP as well as IngressIPs will be allocated from the same globalCIDR Pool used in
+the Cluster. Globalnet will not support an EgressIP/IngressIP that is outside of globalCIDR
+Pool.
+
 ![GlobalnetTopology](./images/globalnet-topology.png)
 
 If the external application in a remote Cluster is interested in consuming the exported

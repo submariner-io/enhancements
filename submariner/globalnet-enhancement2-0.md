@@ -37,9 +37,9 @@ Egress traffic:
 * Provision to allocate a set of globalIPs at the namespace/project level which takes precedence
   over the globalIPs allocated to the cluster. All Pods in the namespace will use the same globalIPs
   as EgressIPs.
-* Provision to allocate globalIPs to a Pod (or a set of Pods) from the selected namespaces or
-  from any namespace. Such Pods will use globalIPs that take precedence over any globalIPs allocated
-  at the default namespace level.
+* Provision to allocate globalIPs to a set of Pods from the selected namespaces or from any namespace.
+  Such Pods will use globalIPs that take precedence over any globalIPs allocated at the default
+  namespace level.
 
 Ingress traffic:
 
@@ -114,14 +114,22 @@ type GlobalnetEgressIP struct {
 }
 
 type EgressIPSpec struct {
-    // GlobalIPs is a list of EgressIPs requested. The requested globalIPs should be part
-    // of globalCIDR of the Cluster. If the requested globalIPs are not allocated to other
-    // K8s objects, then it will be allocated and the status field will be updated accordingly.
-    // If the globalIPs are already allocated to other objects, creation of the CRD will fail.
+    // User can explicitly request a specific GlobalIP and this should be a valid IPaddress
+    // from globalnetCIDR allocated to the Cluster. If the requested globalIP falls outside
+    // of the globalnetCIDR or is already allocated (either fully or partially), then Status
+    // field will be set to Error with appropriate message.
     // If this field is not specified, a single globalIP will be allocated.
     // This field cannot be changed through updates.
     // +optional
-    GlobalIPs  []string `json:"globalIPs,omitempty"`
+    GlobalIP      string  `json:"globalIP,omitempty"`
+
+    // The number of globalIP's requested. Globalnet Controller will allocate the requested
+    // number of contiguous GlobalIPs for this GlobalnetEgressIP object.
+    // User can specify this field while omitting GlobalIP. In such cases, Globalnet will
+    // auto-allocate the requested number of contiguous GlobalIPs.
+    // If unspecified, NumGlobalIPs defaults to 1.
+    // +optional
+    NumGlobalIPs  int     'json:"numGlobalIPs",omitempty"`
 
     // Selects the Namespaces to which this GlobalnetEgressIP object applies.
     // If an empty namespaceSelector: {} is configured, it selects all the Pods in all namespaces.
@@ -250,7 +258,17 @@ To achieve this, one can apply the following CRD.
            role: db
 ```
 
-5.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
+5.In a Globalnet deployment, user wants a specific service to be made available to remote clusters.
+  For this, user can create a ClusterIP Service and export the Service. Globalnet will allocate a
+  globalIP for ingress connectivity such that any external applications can connect to this Service.
+
+```shell
+  kubectl -n default create deployment nginx --image=nginxinc/nginx-unprivileged:stable-alpine
+  kubectl -n default expose deployment nginx --port=8080
+  subctl export service --namespace default nginx
+```
+
+6.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
   to use a unique globalIP both as ingress and egressIP for cross-cluster communication.
 
   To achieve this, user can create a Headless Service (backed by a Deployment or StatefulSets) and
@@ -310,4 +328,4 @@ Clusters with non-overlapping CIDRs and use Vanilla Submariner instead of Global
 9. Implement necessary unit tests for each of the use-cases.
 10. Implement necessary e2e tests to validate various use-cases.
 11. Update documentation.
-12. Support upgrade from 0.8 release to the newer implementation.
+12. Document how to upgrade from 0.8 release to the newer implementation.

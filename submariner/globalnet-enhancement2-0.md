@@ -132,7 +132,9 @@ type EgressIPSpec struct {
     NumGlobalIPs  int     'json:"numGlobalIPs",omitempty"`
 
     // Selects the Namespaces to which this GlobalnetEgressIP object applies.
-    // If an empty namespaceSelector: {} is configured, it selects all the Pods in all namespaces.
+    // If an empty namespaceSelector: {} is configured, it selects all namespaces.
+    // If an empty namespaceSelector: {} is configured along with empty PodSelector, it applies
+    // to whole Cluster.
     // On the other hand, if you omit specifying namespaceSelector, it does not select any
     // namespaces and selects only Pods from the namespace where the GlobalnetEgressIP is
     // deployed to.
@@ -179,9 +181,28 @@ type EgressIPStatus struct {
 }
 ```
 
+When Submariner Globalnet is deployed in a Cluster, it auto-allocates the configured number of
+`globalIPs` and programs the necessary egress rules on the active Gateway node of the Cluster.
+This is done internally by creating GlobalnetEgressIP CR object with the name `cluster-default`.
+Users can query the CR to check the `Status.globalIPs` allocated at the Cluster level. If users
+create multiple GlobalnetEgressIP CRs that match the Cluster scope, one of the egressIP at the
+Cluster scope will be used.
+
 Creation of GlobalnetEgressIP object will be controlled via a ClusterRole and only users having
 the necessary role will be able to create the objects. The GlobalnetEgressIP object can be
 created in any namespace with selectors that match any other namespaces.
+
+|    NamespaceSelector     | PodSelector           | Behavior  |
+| :-------------: |:-------------:| :-----:|
+| `project=ns1` | omitted     | Selects all Pods in Namespace with label `project=ns1` |
+| `project=ns1` | `{}`        | Selects all Pods in Namespace with label `project=ns1` |
+| `project=ns1` | `role=db`   | Selects all Pods that match label `role=db` in Namespace with label `project=ns1` |
+| `{}`          | omitted     | Applies to whole Cluster as it selects all Pods in all Namespaces. |
+| `{}`          | `{}`        | Applies to whole Cluster as it selects all Pods in all Namespaces. |
+| `{}`          | `role=db`   | Selects pods with label `role=db` in all Namespaces. |
+| omitted       | omitted     | Error |
+| omitted       | `{}`        | Selects all the Pods from the Namespace where the CR is deployed. |
+| omitted       | `role=db`   | Selects Pods with label `role=db` in the Namespace where CR is deployed. |
 
 ### Backward Compatibility
 
@@ -214,8 +235,8 @@ implementation of Globalnet.
      namespaceSelector:
        matchLabels:
          project: ns1
-     globalIPs:
-       - "169.254.1.30"
+     globalIP: "169.254.1.30"
+     numGlobalIPs: 1
 ```
 
 3.In a Globalnet deployment user wants the Pods in a namespace `ns1` to use unique globalIPs
@@ -232,10 +253,8 @@ To achieve this, one can apply the following CRD.
      namespaceSelector:
         matchLabels:
           project: ns1
-     globalIPs:
-       - "169.254.1.30"
-       - "169.254.1.32"
-       - "169.254.1.40"
+     globalIP: "169.254.1.100"
+     numGlobalIPs: 4
 ```
 
 4.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace

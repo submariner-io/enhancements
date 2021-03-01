@@ -335,16 +335,20 @@ Clusters with non-overlapping CIDRs and use Vanilla Submariner instead of Global
 ## Work items
 
 1. Support creation of GlobalnetEgressIP CRD and the associated Cluster Roles.
+   * [Create Clientset, informers and listers for GlobalnetEgressIP CRD](https://github.com/submariner-io/submariner/issues/1157)
+   * [Create ClusterRoles for accessing GlobalnetEgressIP CRD](https://github.com/submariner-io/submariner-operator/issues/1114)
 2. Provide configuration parameter either via ConfigMap or Env variable to specify
    the number of default GlobalIPs that have to be allocated at cluster level.
-3. Support Globalnet EgressIPs at the cluster level and program necessary egress rules.
-4. Support Globalnet EgressIPs at namespace level which takes precedence over
-   globalIPs at cluster level.
-5. Support Globalnet EgressIPs to Pods (or set of Pods) which has the highest precedence.
-6. Annotate only exported Services instead of annotating all Services.
-7. Support Headless Services and program ingress/egress rules for the backend Pods.
-8. Avoid dependency on the iptable chains programmed by IPtables kube-proxy driver.
+   * [Configuration parameter for default number of globalIPs at Cluster level](https://github.com/submariner-io/submariner-operator/issues/1116)
+3. [Support Globalnet EgressIPs at the cluster level and program necessary egress rules.](https://github.com/submariner-io/submariner/issues/1163)
+4. [Support Globalnet EgressIPs at namespace level which takes precedence over
+   globalIPs at cluster level.](https://github.com/submariner-io/submariner/issues/1164)
+5. [Support Globalnet EgressIPs to Pods (or set of Pods) which has the highest precedence.](https://github.com/submariner-io/submariner/issues/1165)
+6. [Annotate only exported Services instead of annotating all Services.](https://github.com/submariner-io/submariner/issues/720)
+7. [Support Headless Services and program ingress/egress rules for the backend Pods.](https://github.com/submariner-io/submariner/issues/732)
+8. This is a good to have internal enhancement and does not modify the user experience.
+   [Avoid dependency on the IPtable chains programmed by IPtables kube-proxy driver.](https://github.com/submariner-io/submariner/issues/1166)
 9. Implement necessary unit tests for each of the use-cases.
-10. Implement necessary e2e tests to validate various use-cases.
-11. Update documentation.
-12. Document how to upgrade from 0.8 release to the newer implementation.
+10. [Implement necessary e2e tests to validate various use-cases.](https://github.com/submariner-io/submariner/issues/1167)
+11. [Update documentation.](https://github.com/submariner-io/submariner-website/issues/455)
+12. [Document how to upgrade from 0.8 release to the newer implementation.](https://github.com/submariner-io/submariner-website/issues/456)

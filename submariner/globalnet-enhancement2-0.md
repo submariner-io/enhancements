@@ -37,7 +37,7 @@ Egress traffic:
 * Provision to allocate a set of globalIPs at the namespace/project level which takes precedence
   over the globalIPs allocated to the cluster. All Pods in the namespace will use the same globalIPs
   as EgressIPs.
-* Provision to allocate globalIPs to a set of Pods from the selected namespaces or from any namespace.
+* Provision to allocate globalIPs to a set of Pods in a selected namespace or cluster-wide.
   Such Pods will use globalIPs that take precedence over any globalIPs allocated at the default
   namespace level.
 
@@ -50,10 +50,10 @@ Ingress traffic:
   a unique globalIP as an Ingress IP. Clients can discover the associated globalIP using
   Lighthouse and can connect to the globalIP assigned to the backend pods.
   For Pods backed by Headless Services, if the user does not explicitly request a globalIP via
-  GlobalnetEgressIP CRD, the same globalIP assigned to the Pods will be used for both Ingress
-  as-well-as Egress. However, if user creates a GlobalnetEgressIP that matches the namespace,
-  or the backend pods of Headless Service, the globalIP assigned via GlobalnetEgressIP takes
-  precedence over individual Pod globalIPs as EgressIP.
+  NamespaceGlobalEgressIP CRD, the same globalIP assigned to the Pods will be used for both
+  Ingress as-well-as Egress. However, if user creates a NamespaceGlobalEgressIP that matches
+  the namespace, or the backend pods of Headless Service, the globalIP assigned via NamespaceGlobalEgressIP
+  takes precedence over individual Pod globalIPs as EgressIP.
 
 Both EgressIP as well as IngressIPs will be allocated from the same globalCIDR Pool used in
 the Cluster. Globalnet will not support an EgressIP/IngressIP that is outside of globalCIDR
@@ -85,7 +85,7 @@ improve the overall performance of the solution.
 
 A limitation with the proposed approach is that we will lose the unique identity for **every**
 Pod which is supported today. For users that intend to use Network Policies across Clusters or
-for debugging purposes, this can be mitigated by creating the necessary GlobalnetEgressIP CRDs
+for debugging purposes, this can be mitigated by creating the necessary NamespaceGlobalEgressIP CRDs
 which create unique globalIPs at the Namespace/Pod level.
 
 ### Caveats
@@ -101,77 +101,77 @@ will be closer to the Vanilla Submariner experience.
 The following CRD is proposed to support the new design.
 
 ```Go
-type GlobalnetEgressIP struct {
+type ClusterGlobalEgressIP struct {
     metav1.TypeMeta   `json:",inline"`
     metav1.ObjectMeta `json:"metadata,omitempty"`
 
-    // Spec is the specification of desired behavior of GlobalnetEgressIP object.
-    Spec               EgressIPSpec `json:"spec"`
+    // Spec is the specification of desired behavior of ClusterGlobalEgressIP object.
+    Spec               ClusterEgressIPSpec `json:"spec"`
 
-    // Observed status of GlobalnetEgressIP. Its a read-only field.
+    // Observed status of NamespaceGlobalEgressIP. Its a read-only field.
     // +optional
     Status             EgressIPStatus `json:"status,omitempty"`
 }
 
-type EgressIPSpec struct {
-    // User can explicitly request a specific GlobalIP and this should be a valid IPaddress
-    // from globalnetCIDR allocated to the Cluster. If the requested globalIP falls outside
-    // of the globalnetCIDR or is already allocated (either fully or partially), then Status
-    // field will be set to Error with appropriate message.
-    // If this field is not specified, a single globalIP will be allocated.
-    // This field cannot be changed through updates.
-    // +optional
-    GlobalIP      string  `json:"globalIP,omitempty"`
-
+type ClusterEgressIPSpec struct {
     // The number of globalIP's requested. Globalnet Controller will allocate the requested
-    // number of contiguous GlobalIPs for this GlobalnetEgressIP object.
-    // User can specify this field while omitting GlobalIP. In such cases, Globalnet will
-    // auto-allocate the requested number of contiguous GlobalIPs.
+    // number of contiguous GlobalIPs for this ClusterGlobalEgressIP object.
     // If unspecified, NumGlobalIPs defaults to 1.
     // +optional
     NumGlobalIPs  int     'json:"numGlobalIPs",omitempty"`
 
-    // Selects the Namespaces to which this GlobalnetEgressIP object applies.
-    // If an empty namespaceSelector: {} is configured, it selects all namespaces.
-    // If an empty namespaceSelector: {} is configured along with empty PodSelector, it applies
-    // to whole Cluster.
-    // On the other hand, if you omit specifying namespaceSelector, it does not select any
-    // namespaces and selects only Pods from the namespace where the GlobalnetEgressIP is
-    // deployed to.
+    // Selects the pods whose label match the definition. This is an optional field and
+    // in case it is not set, it results in all the Pods selected from all Namespaces.
     // +optional
-    NamespaceSelector metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+    PodSelector metav1.LabelSelector `json:"podSelector,omitempty"`
+}
+
+type NamespaceGlobalEgressIP struct {
+    metav1.TypeMeta   `json:",inline"`
+    metav1.ObjectMeta `json:"metadata,omitempty"`
+
+    // Spec is the specification of desired behavior of NamespaceGlobalEgressIP object.
+    Spec               NamespaceEgressIPSpec `json:"spec"`
+
+    // Observed status of NamespaceGlobalEgressIP. Its a read-only field.
+    // +optional
+    Status             EgressIPStatus `json:"status,omitempty"`
+}
+
+type NamespaceEgressIPSpec struct {
+    // The number of globalIP's requested. Globalnet Controller will allocate the requested
+    // number of contiguous GlobalIPs for this NamespaceGlobalEgressIP object.
+    // If unspecified, NumGlobalIPs defaults to 1.
+    // +optional
+    NumGlobalIPs  int     'json:"numGlobalIPs",omitempty"`
 
     // Selects the pods whose label match the definition. This is an optional field and
-    // in case it is not set, it results in all the Pods selected from the NamespaceSelector.
-    // In case it is set, its intersected with NamespaceSelector, and only Pods that match the
-    // PodSelector and present in the NamespaceSelector will have the GlobalIPs as EgressIPs.
-    // Either namespaceSelector or podSelector have to be specified. If both are omitted,
-    // its considered as an error.
-    // When a Pod or Namespace matches multiple GlobalnetEgressIP objects, there is no guarantee
-    // which of the globalIP address that are assigned to GlobalnetEgressIP will be used.
+    // in case it is not set, it results in all the Pods selected from the namespace in which the
+    // CR is created.
     // +optional
     PodSelector metav1.LabelSelector `json:"podSelector,omitempty"`
 }
 
 const (
-    // GlobalnetEgressIPSuccess means that Globalnet was able to successfully
-    // allocate the GlobalIP as requested in GlobalnetEgressIP object.
-    GlobalnetEgressIPSuccess GlobalnetEgressIPStatus = "Success"
+    // GlobalEgressIPSuccess means that Globalnet was able to successfully allocate the GlobalIP.
+    GlobalEgressIPSuccess GlobalEgressIPStatus = "Success"
 
-    // GlobalnetEgressIPError means that Globalnet was unable to allocate the
-    // GlobalIP for the requested GlobalnetEgressIP object.
-    GlobalnetEgressIPError GlobalnetEgressIPStatus = "Error"
+    // GlobalEgressIPError means that Globalnet was unable to allocate the GlobalIP.
+    GlobalEgressIPError GlobalEgressIPStatus = "Error"
 )
 
 type EgressIPStatus struct {
     // Status is one of {"Success", "Error"}
-    Status GlobalnetEgressIPStatus `json:"status,omitempty"`
+    Status GlobalEgressIPStatus `json:"status,omitempty"`
 
     // +optional
     Message *string `json:"message,omitempty"`
 
-    // The list of GlobalIPs assigned via this GlobalnetEgressIP object.
-    GlobalIPs []string `json:"globalIPs"`
+    // When more than a single GlobalIP is allocated, the starting GlobalIP allocated to this object.
+    StartIP string `json:"globalIPs"`
+
+    // When more than a single GlobalIP is allocated, the last GlobalIP (inclusive) allocated to this object.
+    EndIP string `json:"globalIPs"`
 
     // The Namespaces to which the GlobalIPs are applied.
     Namespaces []string `json:"namespaces"`
@@ -183,33 +183,20 @@ type EgressIPStatus struct {
 
 When Submariner Globalnet is deployed in a Cluster, it auto-allocates the configured number of
 `globalIPs` and programs the necessary egress rules on the active Gateway node of the Cluster.
-This is done internally by creating GlobalnetEgressIP CR object with the name `cluster-default`.
-Users can query the CR to check the `Status.globalIPs` allocated at the Cluster level. If users
-create multiple GlobalnetEgressIP CRs that match the Cluster scope, one of the egressIP at the
-Cluster scope will be used.
+This is done internally by creating `ClusterGlobalEgressIP` CR object with the name `cluster-default`.
+Users can query the CR to check the allocated GlobalIPs at the Cluster level. If users create
+multiple ClusterGlobalEgressIP CRs that match the Cluster scope, one of the egressIP at the Cluster
+scope will be used.
 
-Creation of GlobalnetEgressIP object will be controlled via a ClusterRole and only users having
-the necessary role will be able to create the objects. The GlobalnetEgressIP object can be
-created in any namespace with selectors that match any other namespaces.
-
-|    NamespaceSelector     | PodSelector           | Behavior  |
-| :-------------: |:-------------:| :-----:|
-| `project=ns1` | omitted     | Selects all Pods in Namespace with label `project=ns1` |
-| `project=ns1` | `{}`        | Selects all Pods in Namespace with label `project=ns1` |
-| `project=ns1` | `role=db`   | Selects all Pods that match label `role=db` in Namespace with label `project=ns1` |
-| `{}`          | omitted     | Applies to whole Cluster as it selects all Pods in all Namespaces. |
-| `{}`          | `{}`        | Applies to whole Cluster as it selects all Pods in all Namespaces. |
-| `{}`          | `role=db`   | Selects pods with label `role=db` in all Namespaces. |
-| omitted       | omitted     | Error |
-| omitted       | `{}`        | Selects all the Pods from the Namespace where the CR is deployed. |
-| omitted       | `role=db`   | Selects Pods with label `role=db` in the Namespace where CR is deployed. |
+Only an admin user can create the `ClusterGlobalEgressIP` object and regular users will only be able
+to create `NamespaceGlobalEgressIP` objects.
 
 ### Backward Compatibility
 
 Inorder to support the newer implementation, a combination of ipSets with multiple IPTable chains
-will be used. Also, we will require two annotations, one for ingressGlobalIP and the other for
-egressGlobalIP. Because of this, backward compatibility cannot be maintained with the existing
-implementation of Globalnet.
+will be used. Also, we will internally use configMaps to maintain the state of allocated GlobalIPs
+and get rid of annotations on the objects. Because of this, backward compatibility cannot be maintained
+with the existing implementation of Globalnet.
 
 ### User Stories
 
@@ -221,60 +208,37 @@ implementation of Globalnet.
   which will be used as egressIPs for inter-cluster communication and necessary Services can be
   exported.
 
-2.In a Globalnet deployment user wants the Pods in a namespace `ns1` to use a unique globalIP
+2.In a Globalnet deployment user wants all the Pods in a namespace `ns1` to use a unique globalIP
   instead of the globalIP assigned at the cluster level.
 
-  To achieve this, one can apply the following CRD.
+  To achieve this, one can apply the following CRD in the namespace `ns1`.
 
 ```yaml
    apiVersion: submariner.io/v1alpha1
-   kind: GlobalnetEgressIP
+   kind: NamespaceGlobalEgressIP
    metadata:
      name: ns-egressip
+     namespace: ns1
    spec:
-     namespaceSelector:
-       matchLabels:
-         project: ns1
-     globalIP: "169.254.1.30"
      numGlobalIPs: 1
 ```
 
-3.In a Globalnet deployment user wants the Pods in a namespace `ns1` to use unique globalIPs
-  instead of the globalIPs assigned at the cluster level.
+3.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
+  to use a unique globalIPs as egressIP for cross-cluster communication.
 
-To achieve this, one can apply the following CRD.
-
-```yaml
-   apiVersion: submariner.io/v1alpha1
-   kind: GlobalnetEgressIP
-   metadata:
-     name: ns-egressip
-   spec:
-     namespaceSelector:
-        matchLabels:
-          project: ns1
-     globalIP: "169.254.1.100"
-     numGlobalIPs: 4
-```
-
-4.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
-  to use a unique globalIP as egressIP for cross-cluster communication.
-
-  To achieve this, one can apply the following CRD.
+  To achieve this, one can apply the following CRD in the namespace `ns1`.
 
 ```yaml
    apiVersion: submariner.io/v1alpha1
-   kind: GlobalnetEgressIP
+   kind: NamespaceGlobalEgressIP
    metadata:
      name: db-pods
      namespace: ns1
    spec:
-     namespaceSelector:
-       matchLabels:
-         project: ns1
      podSelector:
          matchLabels:
            role: db
+     NumGlobalIPs: 2
 ```
 
 5.In a Globalnet deployment, user wants a specific service to be made available to remote clusters.
@@ -292,8 +256,8 @@ To achieve this, one can apply the following CRD.
 
   To achieve this, user can create a Headless Service (backed by a Deployment or StatefulSets) and
   Globalnet will ensure that all the backend Pods that belong to the Headless Service are assigned
-  a globalIP. User is also expected **not** to create any GlobalnetEgressIP object which selects the
-  backendPods that match the Headless Service.
+  a globalIP. User is also expected **not** to create any NamespaceGlobalEgressIP object which selects
+  the backendPods that match the Headless Service.
 
 ![HeadlessService](./images/globalnet-headless-svc.png)
 
@@ -301,25 +265,19 @@ To achieve this, one can apply the following CRD.
   both ingress and egress communication.
 
   However, if the user wants egress traffic from the http Pods to carry a unique globalIP,
-  its possible by explicitly requesting a GlobalnetEgressIP with PodSelectors matching Headless
-  Service Pods as shown below.
+  its possible by explicitly requesting a NamespaceGlobalEgressIP with PodSelectors matching
+  Headless Service Pods as shown below.
 
 ```yaml
    apiVersion: submariner.io/v1alpha1
-   kind: GlobalnetEgressIP
+   kind: NamespaceGlobalEgressIP
    metadata:
      name: http-pods
      namespace: myproject
    spec:
-     namespaceSelector:
-       matchLabels:
-         project: ns1
      podSelector:
        matchLabels:
          app: http
-   status:
-     globalIPs:
-      - 169.254.0.100
 ```
 
 ![Headless Service with EgressIP](./images/globalnet-svc.png)
@@ -334,7 +292,7 @@ Clusters with non-overlapping CIDRs and use Vanilla Submariner instead of Global
 
 ## Work items
 
-1. Support creation of GlobalnetEgressIP CRD and the associated Cluster Roles.
+1. Support creation of ClusterGlobalEgressIP and NamespaceGlobalEgressIP CRDs and the associated Cluster Roles.
    * [Create Clientset, informers and listers for GlobalnetEgressIP CRD](https://github.com/submariner-io/submariner/issues/1157)
    * [Create ClusterRoles for accessing GlobalnetEgressIP CRD](https://github.com/submariner-io/submariner-operator/issues/1114)
 2. Provide configuration parameter either via ConfigMap or Env variable to specify

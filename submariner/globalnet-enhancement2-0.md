@@ -43,17 +43,17 @@ Egress traffic:
 
 Ingress traffic:
 
-* Instead of annotating every ClusterIP Service in the cluster, only exported Services will be
-  annotated with a globalIP.
+* Instead of assigning a globalIP every ClusterIP Service in the cluster, only exported Services
+  will be assigned a globalIP. Globalnet internally creates a GlobalIngressIP CR for every
+  exported service.
 * For Headless Services, necessary ingress rules will be programmed to support connectivity to
-  the backend Pods. In a Headless Service use-case, every backend Pod will be annotated with
-  a unique globalIP as an Ingress IP. Clients can discover the associated globalIP using
-  Lighthouse and can connect to the globalIP assigned to the backend pods.
-  For Pods backed by Headless Services, if the user does not explicitly request a globalIP via
-  GlobalEgressIP CRD, the same globalIP assigned to the Pods will be used for both Ingress
-  as-well-as Egress. However, if user creates a GlobalEgressIP that matches the namespace,
-  or the backend pods of Headless Service, the globalIP assigned via GlobalEgressIP takes
-  precedence over individual Pod globalIPs as EgressIP.
+  the backend Pods. In a Headless Service use-case, every backend Pod will be assigned a unique
+  globalIP as an Ingress IP. Clients can discover the associated globalIP using Lighthouse and
+  can connect to the globalIP assigned to the backend pods. For Pods backed by Headless Services,
+  if the user does not explicitly request a globalIP via GlobalEgressIP CRD, the same globalIP
+  assigned to the Pods will be used for both Ingress as-well-as Egress. However, if user creates
+  a GlobalEgressIP that matches the namespace, or the backend pods of Headless Service, the globalIP
+  assigned via GlobalEgressIP takes precedence over individual Pod globalIPs as EgressIP.
 
 Both EgressIP as well as IngressIPs will be allocated from the same globalCIDR Pool used in
 the Cluster. Globalnet will not support an EgressIP/IngressIP that is outside of globalCIDR
@@ -77,7 +77,7 @@ The proposal has its own set of Pros and Cons.
 
 ### Pros
 
-Since we will be annotating only select K8s objects with globalIP, it will help in improved scalability.
+Since we will be allocating globalIPs to only select K8s objects, it will help in improved scalability.
 Also, this translates to fewer iptable rules on the active Gateway node of the cluster which will
 improve the overall performance of the solution.
 
@@ -114,11 +114,12 @@ type ClusterGlobalEgressIP struct {
 }
 
 type ClusterGlobalEgressIPSpec struct {
-    // The number of globalIP's requested. Globalnet Controller will allocate the requested
-    // number of contiguous GlobalIPs for this ClusterGlobalEgressIP object.
+    // The number of globalIP's requested at the cluster-level.
+    // Globalnet Controller will allocate the requested number of contiguous GlobalIPs for
+    // this ClusterGlobalEgressIP object.
     // If unspecified, NumGlobalIPs defaults to 1 and max allowed is restricted to 10.
     // +optional
-    NumGlobalIPs  int     'json:"numGlobalIPs",omitempty"`
+    NumGlobalIPs  *int     'json:"numGlobalIPs",omitempty"`
 }
 
 type GlobalEgressIP struct {
@@ -134,11 +135,12 @@ type GlobalEgressIP struct {
 }
 
 type GlobalEgressIPSpec struct {
-    // The number of globalIP's requested. Globalnet Controller will allocate the requested
-    // number of contiguous GlobalIPs for this GlobalEgressIP object.
+    // The number of globalIP's requested at the namespace level or for selected pods in a namespace.
+    // Globalnet Controller will allocate the requested number of contiguous GlobalIPs for this
+    // GlobalEgressIP object.
     // If unspecified, NumGlobalIPs defaults to 1 and max allowed is restricted to 10.
     // +optional
-    NumGlobalIPs  int     'json:"numGlobalIPs",omitempty"`
+    NumGlobalIPs  *int     'json:"numGlobalIPs",omitempty"`
 
     // Selects the pods whose label match the definition. This is an optional field and
     // in case it is not set, it results in all the Pods selected from the namespace in which the
@@ -170,9 +172,9 @@ type EgressIPStatus struct {
 When Submariner Globalnet is deployed in a Cluster, it auto-allocates the configured number of
 `globalIPs` and programs the necessary egress rules on the active Gateway node of the Cluster.
 This is done internally by creating `ClusterGlobalEgressIP` CR object with the name `cluster-default`.
-Users can query the CR to check the allocated GlobalIPs at the Cluster level. If users create
-multiple ClusterGlobalEgressIP CRs that match the Cluster scope, one of the egressIP at the Cluster
-scope will be used.
+Users can query the CR to check the allocated GlobalIPs at the Cluster level. If admin creates
+additional ClusterGlobalEgressIP CRs that match the Cluster scope, the status field of those CRs will
+be marked as error with appropriate message. Basically only `cluster-default` object will be supported.
 
 Only an admin user can create the `ClusterGlobalEgressIP` object and regular users will only be able
 to create `GlobalEgressIP` objects.
@@ -288,7 +290,7 @@ Clusters with non-overlapping CIDRs and use Vanilla Submariner instead of Global
 4. [Support Globalnet EgressIPs at namespace level which takes precedence over
    globalIPs at cluster level.](https://github.com/submariner-io/submariner/issues/1164)
 5. [Support Globalnet EgressIPs to Pods (or set of Pods) which has the highest precedence.](https://github.com/submariner-io/submariner/issues/1165)
-6. [Annotate only exported Services instead of annotating all Services.](https://github.com/submariner-io/submariner/issues/720)
+6. [Allocate globalIP only to exported Services.](https://github.com/submariner-io/submariner/issues/720)
 7. [Support Headless Services and program ingress/egress rules for the backend Pods.](https://github.com/submariner-io/submariner/issues/732)
 8. This is a good to have internal enhancement and does not modify the user experience.
    [Avoid dependency on the IPtable chains programmed by IPtables kube-proxy driver.](https://github.com/submariner-io/submariner/issues/1166)

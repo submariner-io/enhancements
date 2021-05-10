@@ -187,18 +187,18 @@ with the existing implementation of Globalnet.
 
 ### User Stories
 
-1. User has two (or more) clusters with Overlapping CIDRs and requires the Pods in one
-   Cluster be able to discover and talk to exported Services.
+1.User has two (or more) clusters with Overlapping CIDRs and requires the Pods in one
+  Cluster be able to discover and talk to exported Services.
 
-   To achieve this use-case, user can simply deploy Submariner Globalnet on all the participating
-   clusters. By default, a globalIP (or a set of globalIPs) will be assigned at the Cluster level
-   which will be used as egressIPs for inter-cluster communication and necessary Services can be
-   exported.
+  To achieve this use-case, user can simply deploy Submariner Globalnet on all the participating
+  clusters. By default, a globalIP (or a set of globalIPs) will be assigned at the Cluster level
+  which will be used as egressIPs for inter-cluster communication and necessary Services can be
+  exported.
 
-2. In a Globalnet deployment user wants all the Pods in a namespace `ns1` to use a unique globalIP
-   instead of the globalIP assigned at the cluster level.
+2.In a Globalnet deployment user wants all the Pods in a namespace `ns1` to use a unique globalIP
+  instead of the globalIP assigned at the cluster level.
 
-   To achieve this, one can apply the following CRD in the namespace `ns1`.
+  To achieve this, one can apply the following CRD in the namespace `ns1`.
 
 ```yaml
    apiVersion: submariner.io/v1alpha1
@@ -210,10 +210,10 @@ with the existing implementation of Globalnet.
      numGlobalIPs: 1
 ```
 
-3. In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
-   to use a unique globalIPs as egressIP for cross-cluster communication.
+3.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
+  to use a unique globalIPs as egressIP for cross-cluster communication.
 
-   To achieve this, one can apply the following CRD in the namespace `ns1`.
+  To achieve this, one can apply the following CRD in the namespace `ns1`.
 
 ```yaml
    apiVersion: submariner.io/v1alpha1
@@ -228,9 +228,9 @@ with the existing implementation of Globalnet.
      NumGlobalIPs: 2
 ```
 
-4. In a Globalnet deployment, user wants a specific service to be made available to remote clusters.
-   For this, user can create a ClusterIP Service and export the Service. Globalnet will allocate a
-   globalIP for ingress connectivity such that any external applications can connect to this Service.
+4.In a Globalnet deployment, user wants a specific service to be made available to remote clusters.
+  For this, user can create a ClusterIP Service and export the Service. Globalnet will allocate a
+  globalIP for ingress connectivity such that any external applications can connect to this Service.
 
 ```shell
   kubectl -n default create deployment nginx --image=nginxinc/nginx-unprivileged:stable-alpine
@@ -238,22 +238,22 @@ with the existing implementation of Globalnet.
   subctl export service --namespace default nginx
 ```
 
-5. In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
-   to use a unique globalIP both as ingress and egressIP for cross-cluster communication.
+5.In a Globalnet deployment, user wants a selected Pod (or set of Pods) in a particular namespace
+  to use a unique globalIP both as ingress and egressIP for cross-cluster communication.
 
-   To achieve this, user can create a Headless Service (backed by a Deployment or StatefulSets) and
-   Globalnet will ensure that all the backend Pods that belong to the Headless Service are assigned
-   a globalIP. User is also expected **not** to create any GlobalEgressIP object which selects
-   the backendPods that match the Headless Service.
+  To achieve this, user can create a Headless Service (backed by a Deployment or StatefulSets) and
+  Globalnet will ensure that all the backend Pods that belong to the Headless Service are assigned
+  a globalIP. User is also expected **not** to create any GlobalEgressIP object which selects
+  the backendPods that match the Headless Service.
 
 ![HeadlessService](./images/globalnet-headless-svc.png)
 
-   In the above example, each of the http pods will get its own globalIP which can be used for
-   both ingress and egress communication.
+  In the above example, each of the http pods will get its own globalIP which can be used for
+  both ingress and egress communication.
 
-   However, if the user wants egress traffic from the http Pods to carry a unique globalIP,
-   its possible by explicitly requesting a GlobalEgressIP with PodSelectors matching
-   Headless Service Pods as shown below.
+  However, if the user wants egress traffic from the http Pods to carry a unique globalIP,
+  its possible by explicitly requesting a GlobalEgressIP with PodSelectors matching
+  Headless Service Pods as shown below.
 
 ```yaml
    apiVersion: submariner.io/v1alpha1

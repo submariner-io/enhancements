@@ -182,10 +182,10 @@ type GlobalIngressIP struct {
 }
 
 type GlobalIngressIPSpec struct {
-    // TypeOfObject can be ClusterIPService or a Pod
-    TypeOfObject string `json:"typeOfObject"`
+    // TargetType can be ClusterIPService or a Pod
+    Target TargetType `json:"target"`
 
-    // If the TypeOfObject points to a Pod that belongs to a Headless Service, it uses the
+    // If the TargetType points to a Pod that belongs to a Headless Service, it uses the
     // name of the corresponding Service.
     // +Optional
     ServiceName string `json:"serviceName,omitempty"`
@@ -195,26 +195,17 @@ type GlobalIngressIPStatus struct {
     // +optional
     Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
-    // +optional
-    Message *string `json:"message,omitempty"`
-
     // The GlobalIP assigned to the respective object.
     // +optional
-    GlobalIPs []string `json:"globalIPs"`
+    GlobalIP string `json:"globalIP"`
 }
 
-type TypeOfObject string
+type TargetType string
 
 const (
-    ClusterIPService TypeOfObject = "ClusterIP"
-    Pod              TypeOfObject = "Pod"
+    ClusterIPService TargetType = "ClusterIPService"
+    Pod              TargetType = "Pod"
 )
-
-const (
-    GlobalIngressIPAllocated GlobalIngressIPConditionType = "Allocated"
-    GlobalIngressIPError     GlobalIngressIPConditionType = "Error"
-)
-
 ```
 
 When Submariner Globalnet is deployed in a Cluster, it auto-allocates the configured number of

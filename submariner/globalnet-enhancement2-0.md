@@ -18,7 +18,8 @@ node of the cluster, where the service resides. The ingress rules enable any inc
 destined to the globalIP of the Service to be redirected to the corresponding ClusterIP Service.
 
 In order to support connectivity from the Host Network to the remote services, Globalnet also
-annotates every node in the cluster with a unique globalIP.
+annotates every node in the cluster with a unique globalIP and this functionality will be preserved
+even in the new implementation.
 
 While this works fine for small clusters, where the number of Pods and Services are limited, for
 large clusters it poses scalability and performance issues as we would eventually run out of
@@ -39,6 +40,7 @@ Egress traffic:
 * Provision to allocate globalIPs to a set of Pods in a namespace.
   Such Pods will use globalIPs that take precedence over any globalIPs allocated at the default
   namespace level.
+* Applications on Host Network trying to access remote services will be using the ClusterGlobalEgressIP.
 
 Ingress traffic:
 
@@ -166,6 +168,53 @@ type EgressIPStatus struct {
     // The list of GlobalIPs assigned via this GlobalnetEgressIP object.
     GlobalIPs []string `json:"globalIPs"`
 }
+
+type GlobalIngressIP struct {
+    metav1.TypeMeta   `json:",inline"`
+    metav1.ObjectMeta `json:"metadata,omitempty"`
+
+    // Spec is the specification of desired behavior of GlobalIngressIP object.
+    Spec GlobalIngressIPSpec `json:"spec"`
+
+    // Observed status of GlobalIngressIP. Its a read-only field.
+    // +optional
+    Status GlobalIngressIPStatus `json:"status,omitempty"`
+}
+
+type GlobalIngressIPSpec struct {
+    // TypeOfObject can be ClusterIPService or a Pod
+    TypeOfObject string `json:"typeOfObject"`
+
+    // If the TypeOfObject points to a Pod that belongs to a Headless Service, it uses the
+    // name of the corresponding Service.
+    // +Optional
+    ServiceName string `json:"serviceName,omitempty"`
+}
+
+type GlobalIngressIPStatus struct {
+    // +optional
+    Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+    // +optional
+    Message *string `json:"message,omitempty"`
+
+    // The GlobalIP assigned to the respective object.
+    // +optional
+    GlobalIPs []string `json:"globalIPs"`
+}
+
+type TypeOfObject string
+
+const (
+    ClusterIPService TypeOfObject = "ClusterIP"
+    Pod              TypeOfObject = "Pod"
+)
+
+const (
+    GlobalIngressIPAllocated GlobalIngressIPConditionType = "Allocated"
+    GlobalIngressIPError     GlobalIngressIPConditionType = "Error"
+)
+
 ```
 
 When Submariner Globalnet is deployed in a Cluster, it auto-allocates the configured number of

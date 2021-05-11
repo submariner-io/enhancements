@@ -19,9 +19,9 @@ clusters will be forwarded via this interface to the appropriate clusters.
 if the private IP address is 10.2.96.1 the VTEP IP would be 241.2.96.1.
 * The remote cluster endpoint IPs (either public or private) will be added to the Forwarding Database.
 * The routes will be added to forward all the Service and Pod CIDR traffic to the respective remote VTEP IP.
-* Table 150 shall be used to add the routes, which is otherwise used for host network traffic routes. We do not require any
+* Table 100 shall be used to add the routes, which is otherwise used for host network traffic routes. We do not require any
 extra rules to handle host network traffic for the VXLAN driver.
-* The IPSEC_NATT_PORT used port shall be used as the VTEP port. The parameter name shall be changed to TUNNEL_PORT. This requires changes
+* The IPSEC_NATT_PORT used port shall be used as the VTEP port. The parameter name shall be changed to GATEWAY_UDP_PORT. This requires changes
 in Shipyard, Submariner-Operator, Submariner-Website, Helm and Submariner
 
 ## Work items

@@ -168,7 +168,14 @@ type EgressIPStatus struct {
     // The list of GlobalIPs assigned via this GlobalnetEgressIP object.
     GlobalIPs []string `json:"globalIPs"`
 }
+```
 
+A GlobalIngressIP object will be created for every exported Service in the namespace where the
+service is exported. For Headless Services, backed by Deployments or StatefulSets, Globalnet creates
+a GlobalIngressIP object for every backend pod. It uses "svc-" and "pod-" as prefixes while naming
+these objects and the globalIP assigned to the respective object can be queried from the Status field.
+
+```Go
 type GlobalIngressIP struct {
     metav1.TypeMeta   `json:",inline"`
     metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -189,6 +196,12 @@ type GlobalIngressIPSpec struct {
     // name of the corresponding Service.
     // +Optional
     ServiceName string `json:"serviceName,omitempty"`
+
+    // Since the Name of GlobalIngressIP will be prepended with "svc-" or "pod-" based on
+    // the object, we may have to truncate the name in some cases when the length exceeds the
+    // maximum length that is allowed by K8s. In such cases, the objRef will include the
+    // full name of the object.
+    objRef *LocalObjectReference `json:"objRef,omitempty"`
 }
 
 type GlobalIngressIPStatus struct {
@@ -203,8 +216,8 @@ type GlobalIngressIPStatus struct {
 type TargetType string
 
 const (
-    ClusterIPService TargetType = "ClusterIPService"
-    Pod              TargetType = "Pod"
+    ClusterIPService   TargetType = "ClusterIPService"
+    HeadlessServicePod TargetType = "HeadlessServicePod"
 )
 ```
 

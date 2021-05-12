@@ -118,9 +118,9 @@ type ClusterGlobalEgressIPSpec struct {
     // The number of globalIP's requested at the cluster-level.
     // Globalnet Controller will allocate the requested number of contiguous GlobalIPs for
     // this ClusterGlobalEgressIP object.
-    // If unspecified, NumGlobalIPs defaults to 1 and max allowed is restricted to 10.
+    // If unspecified, NumIPs defaults to 1 and max allowed is restricted to 10.
     // +optional
-    NumGlobalIPs  *int     'json:"numGlobalIPs",omitempty"`
+    NumIPs  *int     'json:"numIPs",omitempty"`
 }
 
 type GlobalEgressIP struct {
@@ -139,9 +139,9 @@ type GlobalEgressIPSpec struct {
     // The number of globalIP's requested at the namespace level or for selected pods in a namespace.
     // Globalnet Controller will allocate the requested number of contiguous GlobalIPs for this
     // GlobalEgressIP object.
-    // If unspecified, NumGlobalIPs defaults to 1 and max allowed is restricted to 10.
+    // If unspecified, NumIPs defaults to 1 and max allowed is restricted to 10.
     // +optional
-    NumGlobalIPs  *int     'json:"numGlobalIPs",omitempty"`
+    NumIPs  *int     'json:"numIPs",omitempty"`
 
     // Selects the pods whose label match the definition. This is an optional field and
     // in case it is not set, it results in all the Pods selected from the namespace in which the
@@ -261,7 +261,7 @@ CRD in the namespace `ns1`.
      name: ns-egressip
      namespace: ns1
    spec:
-     numGlobalIPs: 1
+     numIPs: 1
 ```
 
 #### Unique globalIP for selected Pods in a namespace
@@ -280,7 +280,7 @@ CRD in the namespace `ns1`.
      podSelector:
          matchLabels:
            role: db
-     NumGlobalIPs: 2
+     NumIPs: 2
 ```
 
 #### GlobalIP for exported ClusterIP service

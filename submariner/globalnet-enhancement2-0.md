@@ -111,16 +111,16 @@ type ClusterGlobalEgressIP struct {
 
     // Observed status of ClusterGlobalEgressIP. Its a read-only field.
     // +optional
-    Status             EgressIPStatus `json:"status,omitempty"`
+    Status             GlobalEgressIPStatus `json:"status,omitempty"`
 }
 
 type ClusterGlobalEgressIPSpec struct {
     // The number of globalIP's requested at the cluster-level.
     // Globalnet Controller will allocate the requested number of contiguous GlobalIPs for
     // this ClusterGlobalEgressIP object.
-    // If unspecified, NumIPs defaults to 1 and max allowed is restricted to 10.
+    // If unspecified, NumberOfIPs defaults to 1 and max allowed is restricted to 10.
     // +optional
-    NumIPs  *int     'json:"numIPs",omitempty"`
+    NumberOfIPs  *int     'json:"numberOfIPs",omitempty"`
 }
 
 type GlobalEgressIP struct {
@@ -132,16 +132,16 @@ type GlobalEgressIP struct {
 
     // Observed status of GlobalEgressIP. Its a read-only field.
     // +optional
-    Status             EgressIPStatus `json:"status,omitempty"`
+    Status             GlobalEgressIPStatus `json:"status,omitempty"`
 }
 
 type GlobalEgressIPSpec struct {
     // The number of globalIP's requested at the namespace level or for selected pods in a namespace.
     // Globalnet Controller will allocate the requested number of contiguous GlobalIPs for this
     // GlobalEgressIP object.
-    // If unspecified, NumIPs defaults to 1 and max allowed is restricted to 10.
+    // If unspecified, NumberOfIPs defaults to 1 and max allowed is restricted to 10.
     // +optional
-    NumIPs  *int     'json:"numIPs",omitempty"`
+    NumberOfIPs  *int     'json:"numberOfIPs",omitempty"`
 
     // Selects the pods whose label match the definition. This is an optional field and
     // in case it is not set, it results in all the Pods selected from the namespace in which the
@@ -158,7 +158,7 @@ const (
     GlobalEgressIPError GlobalEgressIPStatus = "Error"
 )
 
-type EgressIPStatus struct {
+type GlobalEgressIPStatus struct {
     // Status is one of {"Success", "Error"}
     Status GlobalEgressIPStatus `json:"status,omitempty"`
 
@@ -166,7 +166,7 @@ type EgressIPStatus struct {
     Message *string `json:"message,omitempty"`
 
     // The list of GlobalIPs assigned via this GlobalnetEgressIP object.
-    GlobalIPs []string `json:"globalIPs"`
+    AllocatedIPs []string `json:"allocatedIPs"`
 }
 ```
 
@@ -210,7 +210,7 @@ type GlobalIngressIPStatus struct {
 
     // The GlobalIP assigned to the respective object.
     // +optional
-    GlobalIP string `json:"globalIP"`
+    AllocatedIP string `json:"allocatedIP"`
 }
 
 type TargetType string
@@ -261,7 +261,7 @@ CRD in the namespace `ns1`.
      name: ns-egressip
      namespace: ns1
    spec:
-     numIPs: 1
+     NumberOfIPs: 1
 ```
 
 #### Unique globalIP for selected Pods in a namespace
@@ -280,7 +280,7 @@ CRD in the namespace `ns1`.
      podSelector:
          matchLabels:
            role: db
-     NumIPs: 2
+     NumberOfIPs: 2
 ```
 
 #### GlobalIP for exported ClusterIP service

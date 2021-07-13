@@ -3,7 +3,7 @@
 ## Summary
 
 This EP, propose a 2 stage development process for improving the
-load balancing of service-to-service communication
+load balancing of pod-to-service communication
 in the multi-cluster setup of Kubernetes using
 Submariner.
 
@@ -50,41 +50,41 @@ performance challenges that need to be addressed.
 
 1. Round-Robin:
 
-The distribution of traffic (i.e request) among Service-Imports of
-the same service type will be equal in expectation.
+  The distribution of traffic (i.e request) among Service-Imports of
+  the same service type will be equal in expectation.
 
 1. Simple Weighted-Round-Robin:
 
-Each Service-Import will be assigned with a weight according to predefined
-parameters (e.g latency, RTT, pricing, etc), the `lower`
-the weight the `higher` the probability to `select` that
-specific service, in such way in expectation the traffic
-will distribute according to the weight.
-For example we have a system with 3 clusters (c1,c2,c3)
-and 2 exports for `service-1` from 2 clusters (c2,c3) in
-each cluster we will assign an appropriate weight for each
-export. An option will be `c1 {c2: 10, c3: 5}` (note that
-c1 does not have a local version of `service-1`),
-`c2 {c2: 0, c3: 4}`, `c3 {c2: 4, c3: 0}`.
-Now, let's take cluster `c1` for example that needs to
-distribute the load between `c2` and `c3` for `service-1`.
-in expectation over time a `1/3` (33%) of the traffic will
-be passed to `c3` and `2/3` (67%) will be passed to `c2` -
-inversed of their weight.
-Note about `zero weight` (`weight=0`). We have already
-implemented a mechanism that prefers local cluster service
-over remote ones, using `lower` weight -> `higher`
-the probability we will make a safety mechanism to return the
-cluster with the `weight=0` always probability will equal = 1.
-For safety, we will not allow more than 1 cluster to have `weight=0`.
+  Each Service-Import will be assigned with a weight according to predefined
+  parameters (e.g latency, RTT, pricing, etc), the `lower`
+  the weight the `higher` the probability to `select` that
+  specific service, in such way in expectation the traffic
+  will distribute according to the weight.
+  For example we have a system with 3 clusters (c1,c2,c3)
+  and 2 exports for `service-1` from 2 clusters (c2,c3) in
+  each cluster we will assign an appropriate weight for each
+  export. An option will be `c1 {c2: 10, c3: 5}` (note that
+  c1 does not have a local version of `service-1`),
+  `c2 {c2: 0, c3: 4}`, `c3 {c2: 4, c3: 0}`.
+  Now, let's take cluster `c1` for example that needs to
+  distribute the load between `c2` and `c3` for `service-1`.
+  in expectation over time a `1/3` (33%) of the traffic will
+  be passed to `c3` and `2/3` (67%) will be passed to `c2` -
+  inversed of their weight.
+  Note about `zero weight` (`weight=0`). We have already
+  implemented a mechanism that prefers local cluster service
+  over remote ones, using `lower` weight -> `higher`
+  the probability we will make a safety mechanism to return the
+  cluster with the `weight=0` always probability will equal = 1.
+  For safety, we will not allow more than 1 cluster to have `weight=0`.
 
 1. Optimize:
 
-The system will calculate a smart weight for Service-Imports of
-the same kind in a way that will minimize some `cost` (will be
-explain shortly) the operator defines.
-From there the traffic (i.e request) distribution will work in
-like the Weighted-Round-Robin fashion.
+  The system will calculate a smart weight for Service-Imports of
+  the same kind in a way that will minimize some `cost` (will be
+  explain shortly) the operator defines.
+  From there the traffic (i.e request) distribution will work in
+  like the Weighted-Round-Robin fashion.
 
 ### Requirements
 

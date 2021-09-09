@@ -7,5 +7,3 @@ rules:
   # Allow standard GHA syntax for "on: *"
   truthy:
     ignore: '.github/workflows/*.yml'
-
-strict: true

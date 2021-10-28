@@ -6,18 +6,13 @@ labels: epic
 ---
 <!-- Please only use this template for submitting epic requests -->
 
-## EPIC Description
+## Epic Description
 
 Why is this needed:
 
 ## Acceptance Criteria
 <!-- Document acceptance criteria here: -->
 
-
-## Work Items
-<!-- Add work items here, 
-make sure you have an item to cover all relevant topics from DoD checklist: -->
- 
 ## Definition of Done (Checklist)
 <!-- Make sure to check all relevant items before end of the release: -->
 
@@ -34,3 +29,6 @@ make sure you have an item to cover all relevant topics from DoD checklist: -->
 * [ ] Documentation added
 * [ ] Release notes added
 
+## Work Items
+<!-- Add work items here.
+Make sure you have item(s) to cover all relevant topics from the checklist above: -->

@@ -2,18 +2,31 @@
 
 ## Summary
 
-This EP, propose a 2 stage development process for improving the
-load balancing of pod-to-service communication
-in the multi-cluster setup of Kubernetes using
-Submariner.
+This EP describes updates and new types needed in the Submariner (especially Lighthouse DNS Plugin) support optimizaiton of service selection
+in the Multi-Cluster environment.
+The EP explains in through the design and architecture of the external system to Submariner that will collect data and actuall optimize the
+service selection using the DNS Service Discovery mechanism. Nevertheless, the actual changes to Submariner (some of them already implemented
+commits are attached) can be summarize in the following 4 points and thier links into this EP.
+
+- [ ] We suggest updating of the [Submariner CRD](#submariner-crd---subctl) to support Service Discovery Load Balancing
+- [X] We suggest New [Load Balancing](#weighted-round-robin) module to be incorporate in the Lighthouse Plugin. [Implementation](https://github.com/submariner-io/lighthouse/tree/devel/pkg/loadbalancer)
+- [X]We suggest several [new/old metrics to be collected by the difefrent components of Submariner](#weighted-round-robin)
+and published into Promethues.
+[Lighthouse Metrics](https://github.com/submariner-io/lighthouse/blob/devel/plugin/lighthouse/metrics.go), []
+- [X]We suggest [a way for publishing of the optimization results](#serviceweightpolicy-distribution)
+(yeilds weights for a weighted load balancing technique).
+[PR link](https://github.com/submariner-io/lighthouse/pull/648)
+
+The actual implemetation details are relevant to an external system in its final implementation stages.
+The system will utelize the Service Discovery mechanism of Submariner, the data points published by Submariner, the load balancer module, and
+the WeightPolicy CRD to acomplish Optmized Service Discovery (also known as Service Selection)
 
 ## Motivation
 
-While the world is moving towards micro-services application-based architecture.
-More organizations combine multi-cluster and multi-cloud providers,
-for reasons such as
+More and more organizations combine multi-cluster and multi-cloud providers for their microservice based applications.
+For reasons such as
 High-Availability, disaster recovery (redundancy),
-scalability, performance, multi-tenant isolation, and others.
+scalability, performance, multi-tenant isolation, and more.
 The above introduces traffic pricing changes and
 performance challenges that need to be addressed.
 
@@ -254,13 +267,15 @@ Two models, which will help us to gradually roll the optimization
 
 ### Basic API and features
 
+#### Submariner CRD - subctl
+
 Allow the operator a simple way to indicate
 the desire load balancer for service discovery,
 with optimal parameters through the `Submariner CRD`.
 
-1. Option 1 - Add the following properties:
+1. Add the following properties:
     1. `serviceDiscoveryLoadBalancing: [round-robin, weighted-round-robin, optimized]`
-    1. `optimizedLoadBalancingPrams: [cost, performance, mixed]`
+    2. `optimizedLoadBalancingPrams: [cost, performance, mixed]`
 
 `cost` - will optimized communication cost
 `performance` - will optimized performance (latency and RTT wise)
@@ -269,6 +284,21 @@ with optimal parameters through the `Submariner CRD`.
 `serviceDiscoveryLoadBalancing` is relevant only for `serviceDiscoveryEnabled: true`
 `optimizedLoadBalancingPrams`
 is relevant only for `serviceDiscoveryLoadBalancing: optimized`
+
+1. Updating the export command to allow adding weights (through annotations) per cluster
+
+`subctl export <serivce> <cluster:weight, cluster:weight....>`
+Note - weights must some to 1 when normalized
+
+#### ServiceWeightPolicy distribution
+
+We are going to use annotations for the ServiceExport and copy them to the newly create ServiceImport
+This will allow us adjusting `source_cluster` <-> `target_cluster` per service weight.
+As the lighthouse plugin listens to newly created ServiceExport aroudn the system,
+and creates the relevant local ServiceImport we will copy the weight annotation from the ServiceExport
+to the newly created ServiceExport.
+
+We shall update the `subctl` to allow weight distribution as well.
 
 ### Implementation and modules
 
@@ -279,6 +309,8 @@ others and their performance and resilience shall be
 tested according to the testing plan provided in the
 following section.
 
+![System Architecture](KOSS-Architecture.png)
+
 #### Weighted-Round-Robin
 
 The first implementation stage will be implemented
@@ -286,24 +318,21 @@ the [Weighted-Round-Robin](https://en.wikipedia.org/wiki/Weighted_round_robin) l
 balancing mechanism in the Lighthouse Plugin.
 
 1. Load-Balancing module - a small lightweight Go library
-   that will implement and abstract the two load balancing
+   that will implement and abstract the different load balancing
    techniques (Round-Robin, Weighted-Round-Robin, etc) away
    from the main implementation, it shall be imported and used
    within the Lighthouse Plugin.
-1. Metrics module - an agent on each cluster (still need to
-   decide/understand if it is already implemented in
-   Submariner Gateway, or if we wish to implement it someplace
-   else). The metrics module will collect and share the
-   relevant data for the cost parameters
-    1. Latency - will be measure using a
-    [HTTPing](https://github.com/flok99/httping) tool
-    1. Pricing - will be extracted from cloud provider pricing API
-    [1](https://calculator.aws/#/createCalculator)
-    [1](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-ppslong.html)
-1. Optimization module - the optimization module will be
+2. Metrics module - This module will be actaully data collected by the different Submariner components and published using Promethues
+   1. Latency - Collected by the Submariner GW Agent and published to Prometheus
+   2. Requests count - Collected by the Submariner DNS Plugin - Lighthouse and published to Promethues
+   3. Egress cost - different cloud providers have different Networking cost, some charge for traffic within the same provider, some charges
+   for leacing a certain zone, etc. We are going to use the open APIs of the different providers fetch the pricing tables and use them.
+   - See - [Submariner monitoring](https://submariner.io/operations/monitoring/) for full list of the data points available.
+3. Optimization module - the optimization module will be
    part of the Broker cluster control plan, it will gather the
    metrics from the different metrics modules calculate the
    weights for each service and update them in the different clusters.
+   - The optimization module is an external system to Submariner
 
 - If time will pressure, or we find it better we might
   combine the Metrics and Optimization modules and
@@ -317,42 +346,9 @@ and easy solution.
 1. Optimization module - similarly to the first stage, the module
    will be part of the
    Broker, just now it will solve the optimization problem described
+   - The optimization module is an external system to Submariner
 1. Estimator Module - will be in-charge of estimating capacity and load if needed
-
-#### Submariner modules responsibilities
-
-- Broker
-
-    1. Extend the Broker API to enable clusters to
-      provide details about latency and load
-    1. Implement a dedicated controller to build and solve the optimization problem
-    1. Publish back to the clusters the appropriate weights
-
-- Clusters
-
-    1. Data collection and publishing:
-
-        1. Use Kubernetes/Submariner built-in metrics
-          controller to publish latency to the Broker
-        1. Use Kubernetes/Submariner built-in metrics
-          controller to publish load (RPS) to the Broker
-        1. Use Kubernetes/Submariner built-in metrics
-          controller to publish capacity (RPS) to the Broker
-
-    1. Load distribution:
-
-        1. Each Endpoint object will have a weight property
-           the Lighthouse plugin each cluster will be aware of these weights
-           and will use a simple Weighted-Round-Robin load balancing algorithm
-           to distribute the load accordingly
-        1. The weights will be published from the Broker to
-           the Clusters
-
-- Notes
-
-    1. We might need to extend the Endpoint object to include the weights params
-    1. Needs to determine the API for sharing the collected
-      metrics from each cluster
+   - The Estimator module module is an external system to Submariner
 
 ### Test plan
 

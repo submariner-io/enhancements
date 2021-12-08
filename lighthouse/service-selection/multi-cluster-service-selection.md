@@ -292,6 +292,7 @@ Note - weights must some to 1 when normalized
 
 #### ServiceWeightPolicy distribution
 
+Based on the [Istio LocalityLoadBalancerSetting](https://istio.io/latest/docs/reference/config/networking/destination-rule/#LocalityLoadBalancerSetting)
 We are going to use annotations for the ServiceExport and copy them to the newly create ServiceImport
 This will allow us adjusting `source_cluster` <-> `target_cluster` per service weight.
 As the lighthouse plugin listens to newly created ServiceExport aroudn the system,

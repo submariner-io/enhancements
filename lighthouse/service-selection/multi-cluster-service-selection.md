@@ -293,13 +293,9 @@ Note - weights must some to 1 when normalized
 #### ServiceWeightPolicy distribution
 
 Based on the [Istio LocalityLoadBalancerSetting](https://istio.io/latest/docs/reference/config/networking/destination-rule/#LocalityLoadBalancerSetting)
-We are going to use annotations for the ServiceExport and copy them to the newly create ServiceImport
-This will allow us adjusting `source_cluster` <-> `target_cluster` per service weight.
-As the lighthouse plugin listens to newly created ServiceExport aroudn the system,
-and creates the relevant local ServiceImport we will copy the weight annotation from the ServiceExport
-to the newly created ServiceExport.
-
-We shall update the `subctl` to allow weight distribution as well.
+We are going to use annotations for the ServiceImport to allow us adjusting `source_cluster` <-> `target_cluster` per service weight.
+Basically all we need to do is conform with the annotations prefix `lighthouse-load-balancer.submariner.io/weight` 
+and add the weight under the prefix + local cluster ID
 
 ### Implementation and modules
 

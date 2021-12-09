@@ -285,16 +285,11 @@ with optimal parameters through the `Submariner CRD`.
 `optimizedLoadBalancingPrams`
 is relevant only for `serviceDiscoveryLoadBalancing: optimized`
 
-1. Updating the export command to allow adding weights (through annotations) per cluster
-
-`subctl export <serivce> <cluster:weight, cluster:weight....>`
-Note - weights must some to 1 when normalized
-
 #### ServiceWeightPolicy distribution
 
 Based on the [Istio LocalityLoadBalancerSetting](https://istio.io/latest/docs/reference/config/networking/destination-rule/#LocalityLoadBalancerSetting)
 We are going to use annotations for the ServiceImport to allow us adjusting `source_cluster` <-> `target_cluster` per service weight.
-Basically all we need to do is conform with the annotations prefix `lighthouse-load-balancer.submariner.io/weight` 
+Basically all we need to do is conform with the annotations prefix `lighthouse-load-balancer.submariner.io/weight`
 and add the weight under the prefix + local cluster ID
 
 ### Implementation and modules

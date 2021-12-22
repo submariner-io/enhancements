@@ -129,7 +129,7 @@ type ServiceImportSpec struct {
    // ClusterID defines the cluster making the Global service available for local consumption.
    ClusterID string `json:"cluster,omitempty"`
    // LocalName defines a local (DNS) name that can be used in the cluster to refer to the global
-   // service. This should typically follow the cluster's Service naming convention 
+   // service. This should typically follow the cluster's Service naming convention
    // (e.g., <service>.<ns>.cluster.local).
    LocalName string `json:"localName,omitempty"`
 }

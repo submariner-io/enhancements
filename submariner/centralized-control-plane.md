@@ -210,6 +210,10 @@ The changes are not backward-compatible (e.g., changes in components being run, 
  service control plane (e.g., a new `ServiceControlPlaneMode` string, with empty string
  indicating current implementation).
 
+> Open: it is possible to emulate the current Submariner service behavior using
+ the proposed control plane. This can be as simple as adding an `ImportToAll`
+ flag to the `axon:Service` object or defining new `Export/ImportPolicy` objects.
+
 #### Affected Components
 
 - workload cluster

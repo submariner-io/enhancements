@@ -12,12 +12,12 @@ Current Submariner service management follows the model and guidelines
 
 The above works well in an environment where clusters are used by a single
  administrative domain and services are commonly shared across all clusters.
- For example, when a company runs clusters as the runtime infrastructure and developers can deploy
- to any cluster for availability, redundancy, or geographic proximity. Another
- common set-up is clusters under different administrative domains (e.g., separated
- by team). In those environments, service naming and sharing may be controlled
- differently.
- We would like to propose a different approach for Service management, that allows:
+ For example, when a company runs clusters as the runtime infrastructure and developers can
+ deploy to any cluster for availability, redundancy, or geographic proximity. However, it is
+ less suited in a deployment model where clusters are owned and operated by different teams,
+ each having independent control and configuration (see next section for elaboration).
+ For those deployments, we would like to propose a different approach for Service management,
+ that allows:
 
 1. Independent service naming (i.e., allow use of different names in different clusters).
 1. Selective imports (i.e., import services into a subset of clusters in the ClusterSet).
@@ -27,6 +27,64 @@ The above works well in an environment where clusters are used by a single
 The design proposal attempts to achieve the above with minimal changes to workload
  clusters, especially with respect to data plane configuration. Ideally, the control
  plane changes proposed will be confined to the Broker cluster only.
+
+## Additional Background and Context
+
+Based on work we've done in Istio (see for example [this](https://istio.io/latest/blog/2019/isolated-clusters/)),
+ we identified two common usage models for clusters:
+
+- **Shared Infrastructure**: clusters are (mostly) identically configured (e.g., namespaces,
+  RBAC, etc.). Each team is allocated the same set of namespaces across all clusters and can
+  deploy to any cluster. The boundary between teams is the namespace. This is the model assumed
+  by MCS and Submariner.
+- **Federated**: clusters are used as the boundary between teams (e.g., they may even be
+  billed to different departments). Each team can only deploy to a subset of the clusters
+  (i.e., the ones they "own") and is granted full reign over that cluster. They are free to
+  choose whatever names they desire. Thus, the federated mode cannot assume name sameness.
+  The teams may still have a shared clusters where the "integrated application" runs, pulling
+  in services from the per team clusters.
+
+The federated usage model needs to support the following use cases (*partial list*...):
+
+- I'd like to export my internal services only to my other clusters, but still consume shared
+  services (e.g., centralized monitoring and alerting) provided by other teams' clusters.
+- I'd like to decouple the local and global names used for services and import a remote service
+  into my namespace using a different name (e.g., two teams can have an "authz" service running
+  in "frontend" namespace, but each is unique).
+- When importing a service I'd like to control its "name" and "location" (e.g., import into a
+  specific namespace with a specific name). I can't assume that the same namespaces exist
+  across all clusters and importing with the same name may conflict with an existing service.
+
+### Relation to MCS API
+
+Based on the above, it should be clear that in "federated" environments service naming and
+ sharing may be controlled differently than proposed by the MCS API. The MCS API objects
+ are building blocks (i.e., a mechanism), and as such can be used by a different policy engines
+ to derive imports and exports, locally or from a central location. This might be
+ "import everywhere" as in Submariner, or a more selective TBD policy.
+
+The MCS API leaves the following aspects out of its scope:
+
+- Name independence across clusters;
+- The mechanism to propagate Exports and Import from/to workload clusters.
+  A synchronization/distribution mechanism is required (e.g., Submariner's Lighthouse is
+  one such example). The mechanism is implementation specific; and
+- Policy objects (e.g., how to declaratively define which exports to import where and with
+  what local workload clusters attributes). These are similarly implementation specific.
+
+The first aspect (name independence) seems to me a fundamental assumption on the MCS API.
+ This makes `ServiceExport` and `ServiceImport` less useful as the abstraction in the central
+ shared location. For example, since all imports are created in the Submariner broker namespace
+ of the ClusterSet, Submariner resorts to tagging the destination namespace and name on the
+ `ServiceImport` using labels and annotations. It might have been clearer to explicitly
+ set those in `ServiceImport.Spec` if MCS provided that. Similarly, the assumption on name
+ sameness has implication on `ServiceExport` (e.g., two completely independent cluster, owned
+ and managed by different teams, must agree on using unique namespaces and/or names, lest their
+ exports conflate when shared).
+
+While all three (naming, synchronization and policies) could be considered as possible
+ enhancements to the MCS API, it would be worthwhile to experiment with different approaches,
+ such as the one defined here, before attempting to reach community consensus on MCS API changes.
 
 ## Proposal
 

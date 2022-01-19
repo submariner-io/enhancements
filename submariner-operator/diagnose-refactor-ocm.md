@@ -15,25 +15,34 @@ this Job, track its completion and fetch results once done.
 
 * A new option `--output json` will be added to `subctl diagnose` to capture output in a json format instead of current
  user readable text format.
-* `subctl diagnose` will also update some Prometheus metrices whenever it is run.
-* A `SubmarinerDiagnoseJob` Job will be created which will run `subctl diagnose` with relevant flags as `command`. This
+* `subctl diagnose` will also update some Prometheus metrics whenever it is run.
+* A `submariner-diagnose` Job will be created which will run `subctl diagnose` with relevant flags as `command`. This
  job will run once to completion. This Job will always run with new option of `--output json`.
 * A new `SubmarinerDiagnose` CRD will be added to SubmarinerAddon. OCM UI will create this CR with relevant values
  to trigger running diagnose from OCM UI.`
-* A new `SubmarnerDiagnose` Controller will be added to OCM SubmarinerAddon. This controller will spawn the SubmarinerDiagnose
+* A new `SubmarnerDiagnoseController` Controller will be added to OCM SubmarinerAddon. This controller will spawn the SubmarinerDiagnose
  Job when SubmarinerDiagnose CR is created, track completion.
-* When SubmarinerDiagnose Job is completed, SubmarinerDiagnoseControler will fetch the logs from diagnose Pod, extract the
+* Only one active `submariner-diagnose` Job will be run in a cluster by SubmarinerAddon at a given time. Users can create
+ multiple SubmarinerDiagnose Jobs manually and we won't enforce any checks to prevent that.  
+* When `submariner-diagnose` Job is completed, SubmarinerDiagnoseController will fetch the logs from diagnose Pod, extract the
  results in json format and populate the relevant Status fields in SubmarinerDiagnose CR.
-* Multiple SubmarinerDiagnose Jobs can be created and run at same time. Note that some of the diagnostic subcommands might have
- issues with multiple concurrent runs as they may interfere with each other.
 * Support will be added to OCM UI to run diagnostics on a cluster with a single click and then display the results. For now,
- it will run with suboption `all`
+ it will run with sub-option `all`
 * Results of diagnose will also be exposed as Prometheus metrics. This will allow any Prometheus based observability
   solutions to consume the results of diagnose. This will also provide a quick and easy way to show results in the UI while
   SubmarinerAddon changes are in-progress.
 * [Initial scope] For initial implementation, SubmarinerDiagnose will always run with `all` but without Firewall Options.
  This is to reduce complexity on OCM UI side to pass credentials for remote cluster which are required for Firewall option.
  This support will be added in later release.
+
+### Alternate Design
+
+* Instead of `--output json` option to provide results in json format for SubmarinerAddon to consume, it will just retain
+ existing text output.
+* UI will provide a link to logs of `submariner-diagnose` Pod and show results as is to the user.
+* Advantage of this design is that newer features can be added to `subctl diagnose` without requiring corresponding changes
+ in UI to consume those results.
+* This will also simplify the code in SubmarinerAddon as it will no longer need to extract and parse diagnose results.
 
 ### SubmarinerDiagnose CRD
 
@@ -80,8 +89,9 @@ FirewallStatus FirewallStatus `json:"firewallStatus,omitempty"`
 }
 
 type ConnectionsStatus struct {
-	// TBD
+// TBD
 }
+
 type FirewallPortStatus string
 
 const (
@@ -108,11 +118,15 @@ spec:
       containers:
       - name: submariner-diagnose-xyz123
         image: submariner-diagnose
-        command: ["subctl",  "diagnose", "all"]
+        command: ["subctl",  "diagnose", "all", "--in-cluster"]
       restartPolicy: Never
+      serviceAccount: submariner-diagnose
+      serviceAccountName: submariner-diagnose
+  backoff-limit: 0
 ```
 
 ### Prometheus Metrics
+
 * submariner_diagnose_errors Total count of error detected, label: cluster-name: counter, will only go up, +1 for each
  error detected by running `subctl diagnose`
 * submariner_k8s_version_support K8s version supported label: cluster-name(1 - for true, 0 - for false)

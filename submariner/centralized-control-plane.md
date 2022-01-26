@@ -7,26 +7,81 @@ Current Submariner service management follows the model and guidelines
  current design has these attributes:
 
 - Exported services are automatically reflected into all clusters in the ClusterSet;
-- Service are exported and imported using the same namespace and name; and
-- Service exports are managed from workload clusters.
+- Service are exported and imported using the same namespace and name;
+- Service exports are managed from workload clusters; and
+- Imported services, having the same namespaced name, are combined on import into one service.
 
 The above works well in an environment where clusters are used by a single
  administrative domain and services are commonly shared across all clusters.
  For example, when a company runs clusters as the runtime infrastructure and developers can
- deploy to any cluster for availability, redundancy, or geographic proximity. However, it is
- less suited in a deployment model where clusters are owned and operated by different teams,
- each having independent control and configuration (see next section for elaboration).
- For those deployments, we would like to propose a different approach for Service management,
- that allows:
+ deploy to any cluster for availability, redundancy, or geographic proximity. We would like
+ to extend this model to support additional use cases. Extensions proposed are enhancement
+ to the base MCS objects and concepts and allow their use in use cases that aren't well
+ supported by the current MCS design. In order to minimize the changes to the base MCS
+ specification, we also outline how a management layer can use the modified definitions
+ to support more use cases as a layer atop MCS.
+
+### Use Cases
+
+We would like to support Multi-Cluster Services in the following additional use cases (see
+also Context section below.):
+
+- **Separate administrative domains**: a deployment model where clusters are owned and operated
+  by different teams, each having independent control and configuration.
+- **Global load balancing**: allow a global load balancer to use services in different clusters.
+- **Non flat networks**: exported services are accessible via an ingress point, such as Ingress,
+  NodePort, LoadBalancer, etc., and not directly using IP addresses of backing Pods.
+- **Centralized management plane**: service sharing is managed from a central location, in a
+  controlled manner (i.e., only identified services in a catalog may be shared).
+- **Non-Kubernetes endpoints**: services may be running outside of Kubernetes (e.g., existing
+  applications running on VMs or bare metals, and not naturally part of a Kubernetes Service).
+- **TBD**: migration of services, brownfield with existing names, attempting to coordinate
+  use of namespaces across all clusters has overhead, merging infra after M&A, release of a new
+  version of testing in the same or different NS, using the same or different name, etc.
+
+### High Level Changes and Relation to MCS API
 
 1. Independent service naming (i.e., allow use of different names in different clusters).
+  This could be done without changes to MCS specification by setting the target Service name
+  and namespace as labels or annotations on the `ServiceImport` object. Alternately, we could
+  extend the objects' `Spec` to explicitly support a different target service name and namespace.
+  Backward compatibility is provided by defaulting to the object namespace and name if the
+  `Spec` does not define a different destination.
 1. Selective imports (i.e., import services into a subset of clusters in the ClusterSet).
+  This can be enabled as an overlay management plane on top of MCS and allows for Services
+  to be imported into specific clusters only. Since the MCS specification does not dictate
+  how `ServiceImport` objects are communicated in a cluster set, this could be done by the
+  controller without changes to MCS objects.
 1. Centralized control over exporting and importing (i.e., defined in Broker, not
-  workload clusters).
+  workload clusters). This too can be an overlay atop MCS with a management plane creating
+  the corresponding `ServiceExport` and `ServiceImport` objects in the respective clusters.
 
-The design proposal attempts to achieve the above with minimal changes to workload
+The first aspect (name independence) makes `ServiceExport` and `ServiceImport` less useful
+ as the abstraction in a central shared location. For example, since all imports are created
+ in the Submariner broker namespace of the ClusterSet, Submariner resorts to tagging the
+ destination namespace and name on the `ServiceImport` using labels and annotations. It might
+ have been clearer to explicitly set those in `ServiceImport.Spec`, if MCS provided that.
+ Similarly, the assumption on name sameness has implication on `ServiceExport` (e.g., two
+ completely independent cluster, owned and managed by different teams, must agree on using
+ unique namespaces and/or names, lest their exports conflate when shared).
+
+It should be further noted that the MCS API specification (intentionally?) leaves the following
+ aspects out of scope, and as a responsibility of some other controller components.
+
+- The mechanism to propagate Exports and Import from/to workload clusters.
+  A synchronization/distribution mechanism is required (e.g., Submariner's Lighthouse is
+  one such example). The mechanism is implementation specific; and
+- Policy objects (e.g., how to declaratively define which exports to import where and with
+  what local workload clusters attributes). These are similarly implementation specific.
+
+While all three (naming, synchronization and policies) could be considered as possible
+ enhancements to the MCS API, it would be worthwhile to experiment with different approaches,
+ such as the one defined here, before attempting to reach community consensus on MCS API changes.
+
+The design proposal attempts to achieve the above goals minimal changes to workload
  clusters, especially with respect to data plane configuration. Ideally, the control
- plane changes proposed will be confined to the Broker cluster only.
+ plane changes proposed will are extensions to MCS or implemented as a layer above
+ MCS and confined to the Broker cluster only.
 
 ## Additional Background and Context
 
@@ -55,47 +110,18 @@ The federated usage model needs to support the following use cases (*partial lis
   specific namespace with a specific name). I can't assume that the same namespaces exist
   across all clusters and importing with the same name may conflict with an existing service.
 
-### Relation to MCS API
+> Elaborate additional use cases here? One section per use cases, explaining motivation and
+> needed extension to the MCS objects and/or model to support the use case.
 
-Based on the above, it should be clear that in "federated" environments service naming and
- sharing may be controlled differently than proposed by the MCS API. The MCS API objects
- are building blocks (i.e., a mechanism), and as such can be used by a different policy engines
- to derive imports and exports, locally or from a central location. This might be
- "import everywhere" as in Submariner, or a more selective TBD policy.
-
-The MCS API leaves the following aspects out of its scope:
-
-- Name independence across clusters;
-- The mechanism to propagate Exports and Import from/to workload clusters.
-  A synchronization/distribution mechanism is required (e.g., Submariner's Lighthouse is
-  one such example). The mechanism is implementation specific; and
-- Policy objects (e.g., how to declaratively define which exports to import where and with
-  what local workload clusters attributes). These are similarly implementation specific.
-
-The first aspect (name independence) seems to me a fundamental assumption on the MCS API.
- This makes `ServiceExport` and `ServiceImport` less useful as the abstraction in the central
- shared location. For example, since all imports are created in the Submariner broker namespace
- of the ClusterSet, Submariner resorts to tagging the destination namespace and name on the
- `ServiceImport` using labels and annotations. It might have been clearer to explicitly
- set those in `ServiceImport.Spec` if MCS provided that. Similarly, the assumption on name
- sameness has implication on `ServiceExport` (e.g., two completely independent cluster, owned
- and managed by different teams, must agree on using unique namespaces and/or names, lest their
- exports conflate when shared).
-
-While all three (naming, synchronization and policies) could be considered as possible
- enhancements to the MCS API, it would be worthwhile to experiment with different approaches,
- such as the one defined here, before attempting to reach community consensus on MCS API changes.
-
-## Proposal
+## Detailed Proposal
 
 ### Goals
 
 - Enable independent service name and namespace in workload clusters.
 - Enable a Service to be imported into a subset of the workload clusters only.
-- Enable centralized control over definition of Service exports and imports. This implies
-  disabling, as much as possible, these definitions from taking effect when created
-  directly on workload clusters. This should enable a future extension to support
-  centralized, policy driven, control over service sharing.
+- Enable centralized control over definition of Service exports and imports.
+- Enable more decoupled binding (i.e., explicit and not only based on names)
+  between existing network endpoints and the service being shared.
   
 ### Non-Goals
 
@@ -110,9 +136,9 @@ While all three (naming, synchronization and policies) could be considered as po
 
 ### Service Control Plane Objects
 
-The Service object model is built around three new CRDs, defined only in the Broker
- cluster. The new CRDs are used to generate the corresponding MCS CRDs, which are
- then replicated to the workload clusters, as today. An `axon` tag is used as the
+The Service object model is an overlay ontop of MCS and built around three new CRDs,
+ defined only in the Broker cluster. The new CRDs are used to generate the corresponding
+ MCS CRDs, which are then replicated to the workload clusters, as today. An `axon` tag is used as the
  [K8s API `Group`](https://book.kubebuilder.io/cronjob-tutorial/gvks.html)
  to differentiate from the Kubernetes and MCS objects with the same name:
 
@@ -120,9 +146,11 @@ The Service object model is built around three new CRDs, defined only in the Bro
   multiple clusters. The Service object represents some API deployed
   in the system. It decouples the local service names used in workload clusters
   from the name that is shared between clusters.
-1. `axon:ServiceBinding` creates an association between a local service and the
-  global name. The object plays a role somewhat akin to `mcs:ServiceExport` but
-  The level of indirection supports breaking the "name sameness" assumption.
+1. `axon:ServiceBinding` creates an association between a local endpoint (e.g., k8s service)
+  and the global name. The object plays a role somewhat akin to `mcs:ServiceExport` but
+  The level of indirection supports breaking the "name sameness" assumption. This also opens
+  up the usage of non-Kubernetes endpoints which, by definition, don't have a corresponding
+  Service object.
 1. Similarly, `axon:ServiceImport` plays the role of `mcs:ServiceImport` but allows
   extending the MCS definition, where and when needed.
 
@@ -141,6 +169,9 @@ A reference to Clusters in the ClusterSet is defined by providing
 
 ```Go
 // ServiceSpec defines the desired state of a Service
+// It is used to provide an agreed upon identity to a service concept that can be share
+// between clusters, independent of the cluster specific names. The CRD does not currently
+// exist in MCS. While possibly useful, it can also be present in the management overlay.
 type ServiceSpec struct {
    // ID is a unique (within a ClusterSet scope) identifier for the Service object.
    // Note that the CRD object name could also be used, in which case ID becomes
@@ -148,7 +179,14 @@ type ServiceSpec struct {
    ID string `json:"id,omitempty"`
    // VIP is a globally significant virtual IP address, allocated by some control
    // or management plane component from a range defined for the ClusterSet.
+   // This is required for collating network observability data from workload clusters.
+   // Alternatively, each workload can assign a locally significant VIP without
+   // central coordination.
    VIP string `json:"vip,omitempty"`
+   // ImportPolicy defines whether exported services bound to this Service should
+   // be imported based on (TBD) policy or automatically to all clusters. Leaving
+   // the default value (false), would result in the current MCS behavior.
+   ImportPolicy bool `json:"importPolicy,omitempty"`
 }
 
 // ServiceStatus defines the observed state of a Service
@@ -170,21 +208,28 @@ type ObjectRef struct {
 }
 
 // ServiceBindingSpec defines the desired state of a ServiceBinding (i.e., a local service
-// binding for a global service identifier)
+// binding for a global service identifier).
+// As an extension to mcs:ServiceExport we would only require the `ServiceID` field to be
+// added, defaulting to the object name and resulting in "namespace sameness".
 type ServiceBindingSpec struct {
    // ServiceID defines the global service for which a local endpoint exists.
    ServiceID string   `json:"service,omitempty"`
    // ClusterID defines the cluster providing the endpoint (via the cluster's Gateways).
    ClusterID string   `json:"cluster,omitempty"`
    // ServiceRef references the local Kubernetes service object bound to the global service.
+   // @todo: extend this to non-Kubernetes services (e.g., localhost ports)
    ServiceRef ObjectRef `json:"serviceRef,omitempty"`
 }
 
 // ServiceImportSpec defines the desired state of a ServiceImport
+// This object lives in the Broker cluster and is used to generate ServiceImports.
+// As an extension to mcs:ServiceImport we would only require the `ServiceID` field to be
+// added, defaulting to the object name and resulting in "namespace sameness".
 type ServiceImportSpec struct {
    // ServiceID defines the global service that is being imported.
    ServiceID string `json:"service,omitempty"`
    // ClusterID defines the cluster making the Global service available for local consumption.
+   // This is needed for centralized management and would not be needed on objects in a workload cluster
    ClusterID string `json:"cluster,omitempty"`
    // LocalName defines a local (DNS) name that can be used in the cluster to refer to the global
    // service. This should typically follow the cluster's Service naming convention

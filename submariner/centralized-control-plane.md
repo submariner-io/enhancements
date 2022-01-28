@@ -231,10 +231,16 @@ type ServiceImportSpec struct {
    // ClusterID defines the cluster making the Global service available for local consumption.
    // This is needed for centralized management and would not be needed on objects in a workload cluster
    ClusterID string `json:"cluster,omitempty"`
-   // LocalName defines a local (DNS) name that can be used in the cluster to refer to the global
-   // service. This should typically follow the cluster's Service naming convention
-   // (e.g., <service>.<ns>.cluster.local).
-   LocalName string `json:"localName,omitempty"`
+   // Namespace defines the mcs:ServiceImport namespace to use when importing.
+   // If empty, defaults to using the object's namespace, resulting in "namespace sameness"
+   Namespace string `json:"namespace,omitempty"`
+   // Name defines the mcs:ServiceImport name to use when importing.
+   // If empty, defaults to using the object's name, resulting in "namespace sameness"
+   Name string `json:"name,omitempty"`
+
+   // @todo the import path fields above define the local cluster name that is used
+   // to refer to the global service. Possible extensions include multiple import
+   // paths and/or DNS aliases
 }
 ```
 

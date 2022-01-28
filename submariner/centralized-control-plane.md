@@ -154,6 +154,15 @@ The Service object model is an overlay ontop of MCS and built around three new C
 1. Similarly, `axon:ServiceImport` plays the role of `mcs:ServiceImport` but allows
   extending the MCS definition, where and when needed.
 
+The diagram shows an example of the objects in the broker cluster and the effect they have on
+the workload clusters. In the example there are two services exported from different
+clusters.
+
+- The Database service is imported into multiple clusters in a new namespace.
+- The OrderMgr service is imported into a single cluster using the same namespace as the bound workload.
+
+![Axon and MCS Resources](./images/axon-mcs.png)
+
 The following CRDs are proposed to support the new design. The CRD definitions
  below are partial and capture only essential parts needed to illustrate the design.
  For brevity, the standard Kubernetes top level CRD definition (e.g., `TypeMeta`,

@@ -1,0 +1,53 @@
+node "Config Cluster" {
+        artifact "OrderMgr" <<Service>> as ords
+        artifact "OrderMgr" <<ServiceImport>> as ordi
+        artifact "OrderMgr" <<ServiceBinding>> as ordb
+        artifact "Database" <<Service>> as ds
+        collections "Database\nnamespace=app" <<ServiceImport>> as si
+        artifact "Database" <<ServiceBinding>> as sb
+}
+node "Cluster 3" as c1 {
+        artifact "app:Database" <<ServiceImport>> as si1
+        artifact "app:Database" <<Service>> as vs1
+}
+node "Cluster 1" as c2 {
+        artifact "app:Database" <<ServiceImport>> as si2
+        artifact "app:Database" <<Service>> as vs2
+        artifact "app:OrderMgr" <<ServiceImport>> as ordi2
+        artifact "app:OrderMgr" <<Service>> as vords2
+}
+node "Cluster 2" as c3 {
+        artifact "app:OrderMgr" <<ServiceExport>> as se3
+        artifact "app:OrderMgr" <<Service>> as ord
+        artifact "Pod 1" as op1
+        artifact "Pod 2" as op2
+}
+node "Cluster 4" as c4 {
+        artifact "prod:Database" <<ServiceExport>> as se
+        artifact "prod:Database" <<Service>> as svc
+        artifact "Pod 1" as p1
+        artifact "Pod 2" as p2
+        artifact "Pod 3" as p3
+}
+si -u-> ds
+sb -u-> ds
+ordi -u-> ords
+ordb -u-> ords
+si -[dotted]-> si1
+si1 --> vs1
+si -[dotted]-> si2
+si2 --> vs2
+se3 --> ord
+sb -[dotted]-> se
+se --> svc
+vs1 -[dashed,#000088]> svc
+vs2 -[dashed,#000088]> svc
+svc -[#000088]-> p1
+svc -[#000088]-> p2
+svc -[#000088]-> p3
+ordi -[dotted]-> ordi2
+ordb -[dotted]-> se3
+ordi2 --> vords2
+vords2 -[dashed,#000088]> ord
+ord -[#000088]-> op1
+ord -[#000088]-> op2

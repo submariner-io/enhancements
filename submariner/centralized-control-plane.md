@@ -320,8 +320,10 @@ The changes are not backward-compatible (e.g., changes in components being run, 
  indicating current implementation).
 
 > Open: it is possible to emulate the current Submariner service behavior using
- the proposed control plane. This can be as simple as adding an `ImportToAll`
- flag to the `axon:Service` object or defining new `Export/ImportPolicy` objects.
+> the proposed control plane. This can be as simple as adding an `ImportToAll`
+> flag to the `axon:Service` object or defining new `Export/ImportPolicy` objects.
+> The use of policy objects allow more control over sharing (e.g., emulate MCS
+> behavior, Skupper behavior, or fine grained importing as discussed above).
 
 #### Affected Components
 

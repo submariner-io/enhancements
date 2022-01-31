@@ -180,7 +180,10 @@ A reference to Clusters in the ClusterSet is defined by providing
 // ServiceSpec defines the desired state of a Service
 // It is used to provide an agreed upon identity to a service concept that can be share
 // between clusters, independent of the cluster specific names. The CRD does not currently
-// exist in MCS. While possibly useful, it can also be present in the management overlay.
+// exist in MCS. While possibly useful, it can also be present only in the management
+// overlay.
+//
+// Note: the (Import/Export) PolicyObjects are currently undefined (see discussion).
 type ServiceSpec struct {
    // ID is a unique (within a ClusterSet scope) identifier for the Service object.
    // Note that the CRD object name could also be used, in which case ID becomes
@@ -192,10 +195,15 @@ type ServiceSpec struct {
    // Alternatively, each workload can assign a locally significant VIP without
    // central coordination.
    VIP string `json:"vip,omitempty"`
-   // ImportPolicy defines whether exported services bound to this Service should
-   // be imported based on (TBD) policy or automatically to all clusters. Leaving
-   // the default value (false), would result in the current MCS behavior.
-   ImportPolicy bool `json:"importPolicy,omitempty"`
+   // ExportPolicy can define which services are bound this Service.
+   // Policy is currently undefined (e.g., could be namespace based, etc). 
+   // Leaving this object empty implies "manual" management of ServiceBindings.
+   ExportPolicy* PolicyObject `json:"exportPolicy,omitempty"`
+   // ImportPolicy defines how exported services bound to this Service should
+   // be imported based on some (TBD) policy object (e.g., automatically to all
+   // clusters). Policy is currently undefined and leaving it empty implies
+   // "manual" management of ServiceImports.
+   ImportPolicy* PolicyObject `json:"importPolicy,omitempty"`
 }
 
 // ServiceStatus defines the observed state of a Service
@@ -276,7 +284,21 @@ The above CRDs are managed by a new Controller, running on the Broker
   relevant cluster. Similar to `axon:ServiceExport` above, the controller confirms a valid
   specification before creating the `mcs:ServiceImport` specification for use by the target
   cluster. Similar `Status.Conditions` interaction may be used between the workload cluster
-  agent and the Broker controller.
+  agent and the Broker controller. Note that this proposal does not *currently* define how
+  conflicts are handled (e.g., the destination cluster already has a local Service matching
+  the import specification. Resolution can be to fail the import, merge endpoints, etc.).
+1. By default, binding and importing are "manually" managed, in the control plane, on a per
+  cluster basis. To simplify UX (e.g., bring it closer to the current model of "sharing driven
+  solely by a ServiceExport"), we may wish to introduce Export and/or Import policies for a
+  Service. For example, to emulate the Skupper behavior, we could define an export policy
+  to automatically create a ServiceBinding for local Service matching a namespace and a name
+  across all clusters, along with an import policy to automatically define imports for all
+  clusters, specifying a target destination namespace. Different policies can be used to
+  emulate Submariner/MCS behavior. Note that policies can be defined inline on the
+  `axon:Service` objects or via an object reference. The inline approach is simpler (e.g.,
+  less CRDs) but also less flexible (e.g., a more rigid policy control than could be possible
+  with references, possibly following the pattern of using a `class` to bind a policy and
+  controller together). We expect these to develop as we start the implementation.
 
 Optional implementation aspects and alternatives:
 
@@ -333,6 +355,10 @@ The changes are not backward-compatible (e.g., changes in components being run, 
 > flag to the `axon:Service` object or defining new `Export/ImportPolicy` objects.
 > The use of policy objects allow more control over sharing (e.g., emulate MCS
 > behavior, Skupper behavior, or fine grained importing as discussed above).
+> Similarly, one could produce a migration agent that takes an existing Submariner
+> Broker configuration and generates the needed corresponding central management
+> objects described in this proposal (e.g., automatically creating `Service` objects
+> and adding a `ServiceBinding` and `ServiceImport` for the relevant clusters).
 
 #### Affected Components
 

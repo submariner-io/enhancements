@@ -1,0 +1,15 @@
+@startuml
+!theme plain
+actor operator 
+
+box Cluster 1
+participant CA
+participant CA_CSR_Syncer
+participant Broker
+end box
+
+operator -> CA: Deploy CA
+CA->CA: Start CA and Configure Issuer
+CA->CA_CSR_Syncer: New CSR Syncer
+CA_CSR_Syncer->CA_CSR_Syncer: Watch CSRs
+@enduml

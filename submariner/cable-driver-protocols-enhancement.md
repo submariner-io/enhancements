@@ -11,7 +11,12 @@ For IP in IP, the benefits fall into the following categories:
 
 * **Performance**: IP in IP is has a lower overhead than VXLAN which could lead to performance
 improvements in terms of packet overhead (bandwidth consumption) as well as the cost of processing
-packets.
+packets. Some of the performance improvements are shown below [1]:
+
+  * ![Throughput rate vs Kernel](./images/tx-tput-rate.png)
+  * ![Throughput rate Gbps](./images/tx-tput-gbps.png)
+  * ![CPU cycles](./images/cpu-cycles.png)
+
 * **Interoperability**:IP in IP can be used to transport packets between domains when the protocol
 in those domains (e.g. IPv6) is not supported by intermediary networks (e.g. IPv4).
 
@@ -177,3 +182,8 @@ clusters gateways cluster1-worker (172.18.0.11) and cluster2-worker (172.18.0.9)
 <!-- markdownlint-enable line-length -->
 
 > **_NOTE:_** For VXLAN in transport mode it is recommended to use the default VXLAN port rather than port 4500.
+
+## References
+
+[1] Ryo NAKAMURA, Improving Packet Transport in Virtual Networking by Encapsulation Techniques 
+<https://repository.dl.itc.u-tokyo.ac.jp/record/51086/file_preview/A34115.pdf>

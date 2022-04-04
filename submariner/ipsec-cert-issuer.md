@@ -110,5 +110,5 @@ separate Certificate CRD).
 * Propagate the Signed Certificate back to the originating GW (leveraging labels and
 annotations) using the Broker.
 
-CA installation and Issuer configuration details can be found here: https://cert-manager.io/docs/installation/
-and https://cert-manager.io/docs/configuration/ca/
+Here are the details for [CA installation](https://cert-manager.io/docs/installation/) and 
+[Issuer configuration](https://cert-manager.io/docs/configuration/ca/)

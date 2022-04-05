@@ -6,7 +6,7 @@ Submariners current security arrangements, namely using an identical pre-shared 
 all deployments will fail security assessment in most environments which have to comply
 with a pre-existing security policy and rules on using VPNs in general and IPSEC in particular.
 
-In order to comply the following minimum enhancement that needs to be implemented is the use
+In order to comply the minimum enhancement that needs to be implemented is the use
 of X509 certificates per Gateway. This will require the introduction of a Certificate Authority
 (CA) that's capable of signing Certificate Signing Requests (CSRs) for Gateways in the
 `ClusterSet`. This CA will be serviced by a Syncer that will act as a proxy between the Certificate
@@ -15,7 +15,7 @@ Requester and the CA itself.
 ## Proposal
 
 This enhancement proposes to use a `ClusterSet` wide `Certificate Authority` and a `Syncer`
-that is co-located with the Broker to service Gateway. At a high level this requires:
+that are co-located with the Broker to service Gateway. At a high level this requires:
 
 * A Certificate Authority that can be used across the ClusterSet. Ideally this authority resides
 on the Broker node.

@@ -17,13 +17,13 @@ packets. Some of the performance improvements are shown below [1]:
   * ![Throughput rate Gbps](./images/tx-tput-gbps.png)
   * ![CPU cycles](./images/cpu-cycles.png)
 
-* **Interoperability**:IP in IP can be used to transport packets between domains when the protocol
+* **Interoperability**: IP in IP can be used to transport packets between domains when the protocol
 in those domains (e.g. IPv6) is not supported by intermediary networks (e.g. IPv4).
 
 For Overlay-over-IPSec in transport mode with further configuration, the benefits fall into the
 following categories:
 
-* **Performance**: Taking advantage of and overlay protocol wrapped in offloaded IPSec in transport mode can
+* **Performance**: Taking advantage of an overlay protocol wrapped in offloaded IPSec in transport mode can
 yield significant performance improvements. The existing IPSEC configuration performance on a pair of modern
 servers ~ 2Gbit maximum. Switching to IP GRE Tunnel protected by an offloaded transport mode IPSEC external
 “wrap” - 25Gbit. A difference of 12.5 times. Or in the case of VXLAN offloaded with an IPSec transport wrap - 9Gbit.
@@ -63,7 +63,7 @@ remote Tunnel IPs.
 
 Example of routeing rules added by the IPTun driver on a gateway node to other nodes
 
-``` bash
+```console
 ip route add 10.2.0.0/16 encap ip id 100 dst 172.18.0.21 via 243.18.0.21 dev ipip0 table 100 metric 100 src 10.1.96.0
 ip route add 100.2.0.0/16 encap ip id 100 dst 172.18.0.21 via 243.18.0.21 dev ipip0 table 100 metric 100 src 10.1.96.0
 ip route add 10.3.0.0/16 encap ip id 100 dst 172.18.0.8 via 243.18.0.8 dev ipip0 table 100 metric 100 src 10.1.96.0
@@ -74,7 +74,7 @@ ip route add 100.4.0.0/16 encap ip id 100 dst 172.18.0.4 via 243.18.0.4 dev ipip
 
 and the resulting routes on the gateway node:
 
-```bash
+```console
 [root@cluster1-worker submariner]# ip route show table 100
 10.2.0.0/16  encap ip id 100 src 0.0.0.0 dst 172.18.0.8 ttl 0 tos 0 via 243.18.0.8 dev ipip-tunnel src 10.1.160.0 metric 100
 10.3.0.0/16  encap ip id 100 src 0.0.0.0 dst 172.18.0.7 ttl 0 tos 0 via 243.18.0.7 dev ipip-tunnel src 10.1.160.0 metric 100
@@ -89,101 +89,7 @@ A high level view of the topology is shown in the diagram below:
 
 > **_NOTE:_** IP-in-IP has a lower processing and bandwidth overhead than VXLAN.
 
-### IPSec Transport mode
-
-This enhancement proposes to extend the available IPSec offering in Submariner to also provide
-transport mode support coupled with the supported overlay protocols (VXLAN, IPinIP...). This
-could provide end-to-end security while greatly reducing the performance overhead of tunnel mode
-secured tunnels for certain scenarios. In terms of implementation, this would require the addition
-of libreswan cable driver configuration parameters to `submariner.io_submariners.yaml`:
-
-```yaml
-    ceIPSecMode:
-        type: string
-    ceIPSecOverlay:
-        type: string
-```
-
-> **_NOTE:_**
->
-> * mode: values can be transport or tunnel (default).
-> * overlay: values can be vxlan or iptun (the supported encapsulation drivers in Submariner).
-
-The other option would be to create a new (optional) ConfigMapfor cable driver configuration and
-add this map to the `submariner.io_submariners.yaml` - this would allow for more detailed
-configurations to be passed to the cable drivers moving forward without having to extend
-the Submariners CRD beyond the addition of the ConfigMap:
-
-```yaml
-cableDriverCustomConfig:
-  properties:
-    configMapName:
-      type: string
-```
-
-The ConfigMap could be kept relatively simple where keys follow the naming convention:
-`ceDriverNameParam`. An example is shown below:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cabledriver-config
-data:
-  ceCustomConfig: |
-    ceIPSecMode: "transport",
-    ceIPSecOverlay: "vxlan",
-    ceIPSecPfsGroup: ["modp2048"]
-    ceIPSecEsp: ["aes_gcm-null"]
-```
-
-On the invocation of the `NewLibreswan()` function the configuration params
-are read and and establish if the request is for a tunnel or transport based
-connection. If the connection is transport based - then the `libreswan` driver
-will need to also drive the VXLAN or IPTun Cable Driver as well as the setup, and
-teardown of the IPSec connections. The existing VXLAN/IPTun Configuration will be the
-same.
-
-An example configuration (that would need to be done by the driver) for a VXLAN over
-IPSec Transport connection between two Submariner clusters gateways cluster1-worker
-(172.18.0.11) and cluster2-worker (172.18.0.9):
-
-<!-- markdownlint-disable line-length -->
-```bash
-[root@cluster1-worker]# ipsec whack --psk --encrypt --name submariner-cable-cluster2-172-18-0-9-0 --host 172.18.0.11 --clientproto udp/vxlan --to --host 172.18.0.9 --clientproto udp 
-[root@cluster1-worker]# ipsec whack --psk --encrypt  --name submariner-cable-cluster2-172-18-0-9-1 --host 172.18.0.11 --clientproto udp --to --host 172.18.0.9 --clientproto udp/vxlan
-[root@cluster1-worker]# ipsec whack --route --name submariner-cable-cluster2-172-18-0-9-0
-[root@cluster1-worker]# ipsec whack --route --name submariner-cable-cluster2-172-18-0-9-1
-[root@cluster1-worker]# ipsec whack --initiate --asynchronous --name submariner-cable-cluster2-172-18-0-9-0
-[root@cluster1-worker]# ipsec whack --initiate --asynchronous --name submariner-cable-cluster2-172-18-0-9-1
-
-[root@cluster2-worker]# ipsec whack --psk --encrypt --name submariner-cable-cluster1-172-18-0-11-0 --host 172.18.0.9 --clientproto udp/vxlan --to --host 172.18.0.11 --clientproto udp 
-[root@cluster2-worker]# ipsec whack --psk --encrypt --name submariner-cable-cluster1-172-18-0-11-1 --host 172.18.0.9 --clientproto udp --to --host 172.18.0.11 --clientproto udp/vxlan
-[root@cluster2-worker]# ipsec whack --route --name submariner-cable-cluster1-172-18-0-11-0
-[root@cluster2-worker]# ipsec whack --route --name submariner-cable-cluster1-172-18-0-11-1
-[root@cluster2-worker]# ipsec whack --initiate --asynchronous --name submariner-cable-cluster1-172-18-0-11-0
-[root@cluster2-worker]# ipsec whack --initiate --asynchronous --name submariner-cable-cluster1-172-18-0-11-1
-```
-<!-- markdownlint-enable line-length -->
-
-An example configuration for an IPinIP over IPSec Transport connection between two Submariner
-clusters gateways cluster1-worker (172.18.0.11) and cluster2-worker (172.18.0.9):
-
-<!-- markdownlint-disable line-length -->
-```bash
-[root@cluster1-worker]# ipsec whack --psk --encrypt --name submariner-cable-cluster2-172-18-0-9-0 --host 172.18.0.11 --clientproto ipv4 --to --host 172.18.0.9 --clientproto ipv4 
-[root@cluster1-worker]# ipsec whack --route --name submariner-cable-cluster2-172-18-0-9-0
-[root@cluster1-worker]# ipsec whack --initiate --asynchronous --name submariner-cable-cluster2-172-18-0-9-0
-
-[root@cluster2-worker]# ipsec whack --psk --encrypt --name submariner-cable-cluster1-172-18-0-11- --host 172.18.0.9 --clientproto ipv4 --to --host 172.18.0.11 --clientproto ipv4 
-[root@cluster2-worker]# ipsec whack --route --name submariner-cable-cluster1-172-18-0-11-0
-[root@cluster2-worker]# ipsec whack --initiate --asynchronous --name submariner-cable-cluster1-172-18-0-11-0
-```
-<!-- markdownlint-enable line-length -->
-
-> **_NOTE:_** For VXLAN in transport mode it is recommended to use the default VXLAN port rather than port 4500.
-
 ## References
 
-[1] Ryo NAKAMURA, Improving Packet Transport in Virtual Networking by Encapsulation Techniques 
+[1] Ryo NAKAMURA, Improving Packet Transport in Virtual Networking by Encapsulation Techniques
 <https://repository.dl.itc.u-tokyo.ac.jp/record/51086/file_preview/A34115.pdf>

@@ -34,23 +34,23 @@ forwarded via this interface to the appropriate clusters.
 
 * A new interface "ipip-tunnel" will be added.
 * The IP tunnelling interface will be one-to-many, that is a single interface will be used to
-connect to all the joined clusters.
+connect to all the joined clusters via lightweight tunnels using `ip route add [addr] encap ip`.
 * For the "ipip-tunnel" IP, the prefix "243" will be used, followed by the rest of the blocks
 from the endpoint private IP address. For example, if the private IP address is 10.2.96.1 the
 "ipip-tunnel" IP would be 243.2.96.1.
 * The routes will be added to forward all the Service and Pod CIDR traffic to the respective
 remote Tunnel IPs.
-* Table 150 shall be used to add the routes for inter-cluster communication.
+* Table 100 shall be used to add the routes for inter-cluster communication.
 
-Example of routeing rules added by the IPTun driver on a gateway node to other nodes
+Example of routing rules added by the IPTun driver on a gateway node to other nodes
 
 ```console
-ip route add 10.2.0.0/16 encap ip id 100 dst 172.18.0.21 via 243.18.0.21 dev ipip0 table 100 metric 100 src 10.1.96.0
-ip route add 100.2.0.0/16 encap ip id 100 dst 172.18.0.21 via 243.18.0.21 dev ipip0 table 100 metric 100 src 10.1.96.0
-ip route add 10.3.0.0/16 encap ip id 100 dst 172.18.0.8 via 243.18.0.8 dev ipip0 table 100 metric 100 src 10.1.96.0
-ip route add 100.3.0.0/16 encap ip id 100 dst 172.18.0.8 via 243.18.0.8 dev ipip0 table 100 metric 100 src 10.1.96.0
-ip route add 10.4.0.0/16 encap ip id 100 dst 172.18.0.4 via 243.18.0.4 dev ipip0 table 100 metric 100 src 10.1.96.0
-ip route add 100.4.0.0/16 encap ip id 100 dst 172.18.0.4 via 243.18.0.4 dev ipip0 table 100 metric 100 src 10.1.96.0
+ip route add 10.2.0.0/16 encap ip id 100 dst 172.18.0.21 via 243.18.0.21 dev ipip-tunnel table 100 metric 100 src 10.1.96.0
+ip route add 100.2.0.0/16 encap ip id 100 dst 172.18.0.21 via 243.18.0.21 dev ipip-tunnel table 100 metric 100 src 10.1.96.0
+ip route add 10.3.0.0/16 encap ip id 100 dst 172.18.0.8 via 243.18.0.8 dev ipip-tunnel table 100 metric 100 src 10.1.96.0
+ip route add 100.3.0.0/16 encap ip id 100 dst 172.18.0.8 via 243.18.0.8 dev ipip-tunnel table 100 metric 100 src 10.1.96.0
+ip route add 10.4.0.0/16 encap ip id 100 dst 172.18.0.4 via 243.18.0.4 dev ipip-tunnel table 100 metric 100 src 10.1.96.0
+ip route add 100.4.0.0/16 encap ip id 100 dst 172.18.0.4 via 243.18.0.4 dev ipip-tunnel table 100 metric 100 src 10.1.96.0
 ```
 
 and the resulting routes on the gateway node:

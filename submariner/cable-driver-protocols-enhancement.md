@@ -1,11 +1,11 @@
-# Cable Driver Protocol Support Enhancements
+# Cable Driver Enhancement - IP-in-IP
 
 ## Summary
 
 Submariner today supports three cable drivers: VXLAN, IPSec (tunnel mode) and WireGuard. The
-goal of this proposal is to outline additional protocols and enhancements for the Submariner
-Cable Driver. These include the additional support of IP-in-IP for unencrypted connections
-between clusters and the support of IPSec transport mode.
+goal of this proposal is to outline additional enhancements needed for the Submariner Cable Driver
+to support of IP-in-IP for unencrypted connections between clusters or for use as an overlay with
+IPSec in transport mode for encrypted connections between clusters.
 
 For IP in IP, the benefits fall into the following categories:
 
@@ -20,26 +20,7 @@ packets. Some of the performance improvements are shown below [1]:
 * **Interoperability**: IP in IP can be used to transport packets between domains when the protocol
 in those domains (e.g. IPv6) is not supported by intermediary networks (e.g. IPv4).
 
-For Overlay-over-IPSec in transport mode with further configuration, the benefits fall into the
-following categories:
-
-* **Performance**: Taking advantage of an overlay protocol wrapped in offloaded IPSec in transport mode can
-yield significant performance improvements. The existing IPSEC configuration performance on a pair of modern
-servers ~ 2Gbit maximum. Switching to IP GRE Tunnel protected by an offloaded transport mode IPSEC external
-“wrap” - 25Gbit. A difference of 12.5 times. Or in the case of VXLAN offloaded with an IPSec transport wrap - 9Gbit.
-* **Scale**: While it is theoretically possible to scale a system built around tunnel mode IPSEC to hundreds of nodes,
-it will be difficult to achieve reliability and stability, especially if there is a complex topology of tunnels. In
-order to achieve such scales, using other L2/L3 VPN tech combined with an optional external IPSEC protection provides
-a better approach, because it allows the use of dynamic routing protocols instead of complex static routing. Furthermore,
-it allows the use of traffic engineering and Site to Site QoS which is impossible in the case of IPSEC Tunnel mode.
-* **Debuggability**: Tunnel mode IPSEC is a debugging nightmare (especially if it is offloaded in part or in full). There
-is no visibility of what goes into the VPN and once it has entered the tunnel it is encrypted and thus unsuitable for debugging.
-This problem goes away if the VPN is using standard L2/L3 VPN technology which provides suitable interfaces on which the system
-administrator can snoop.
-
 ## Proposal
-
-### IP-in-IP Encapsulation
 
 This enhancement proposes to support IP-in-IP for un-encrypted connection between clusters. A
 new IP tunnelling interface `ipip-tunnel` will be added to the active gateway node of each cluster
@@ -49,7 +30,7 @@ forwarded via this interface to the appropriate clusters.
 > **_NOTE:_** A single IP Tunnelling interface will be added, and tunnels managed using
 `# ip route add encap ip <args>` in order to avoid a point to point connection per tunnel.
 
-#### Design Details
+### Design Details
 
 * A new interface "ipip-tunnel" will be added.
 * The IP tunnelling interface will be one-to-many, that is a single interface will be used to

@@ -76,7 +76,7 @@ type SubmarinerCSRSpec struct {
     // "signing", "digital signature", "key agreement"...
     // details can be found here: https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.3
     // and https://github.com/cert-manager/cert-manager/blob/master/internal/apis/certmanager/types.go#L159
-    Usages [] string
+    Usages []string
 }
 
 // SubmarinerCSRStatus defines the status of CertificateRequest and

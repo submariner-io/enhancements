@@ -40,7 +40,7 @@ selected cluster or all clusters based on the query.
 
 ## Work items
 
-- [Enhancement proposal](#525)
-- [Support for SRV records](#526)
-- [Add e2e](#527)
+- [Enhancement proposal](https://github.com/submariner-io/lighthouse/issues/525)
+- [Support for SRV records](https://github.com/submariner-io/lighthouse/issues/526)
+- [Add e2e](https://github.com/submariner-io/lighthouse/issues/527)
 - [Update Docs](https://github.com/submariner-io/submariner-website/issues/510)

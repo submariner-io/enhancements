@@ -2,40 +2,53 @@
 
 ## Summary
 
-Submariner currently assumes full mesh connectivity by default and provisions VPN connections between all participating
-clusters. In addition, Submariner currently offers one of three cable drivers: VXLAN, IPSec or wireguard with limited
-configuration options. Only one of these cable drivers is enabled across all the clusters in a cluster set, that is all
-clusters that join a broker must use the same cable driver. The goal of this proposal is to outline an extended model
-that will support:
+Submariner currently assumes full mesh connectivity in a ClusterSet by default and provisions VPN connections
+between all participating clusters. In addition, Submariner currently offers one of three cable drivers: VXLAN,
+IPSec or wireguard. Only one of these cable drivers is enabled across all the clusters in a ClusterSet, that is
+all clusters that join a broker must use the same cable driver. The goal of this proposal is to outline an extended
+model that will support:
 
-- The selection of which clusters to connect and in what fashion (full mesh or connection to subset of clusters in
-  a ClusterSet).
-- The selection of one or more cable drivers in order to support different cable types between connected clusters.
-  For example, IPSec between public and private clouds but raw VXLAN between the clusters in the same cloud.
+- The selection of which clusters in a ClusterSet to connect/not connect.
+- The selection of one or more cable drivers in order to support different cable types between connected clusters,
+  and how to configure them. For example, an IPSec cable between public and private clouds but a VXLAN cable between
+  the clusters in the same cloud.
 
 There are use cases that involve supporting a mix of cable drivers or cable driver configurations within the same
-cluster set. For example, a cluster set could contain three clusters, two that are on-premise and the other
-in the cloud. Connections to the cloud cluster will need to use encryption while the on-premise clusters can use
+ClusterSet. For example, a ClusterSet could contain three clusters, two that are on-premise and the other
+in a public cloud. Connections to the cloud cluster will need to use encryption while the on-premise clusters can use
 unencrypted connections, as they’re connected by a private link, to avoid the performance overhead of encryption.
 This could be achieved using either:
 
 - Different cable driver implementations or
 - The same cable driver implementation with differing configurations.
 
-For other use cases, it makes sense to offer finer-grained connectivity options. One such use case is a client-server
-scenario where multiple client clusters need to access a server cluster but the user does not want the client clusters
-to connect to one another. Finer-grained connectivity could also improve overall scalability where full mesh is not
-required.
+For other use cases, it makes sense to offer finer-grained connectivity options. One such use case is a scenario
+where multiple clusters need to access a service offered by another cluster but the user does not want to connect
+the clusters that require the service to one another. Finer-grained connectivity could also improve overall
+scalability where full mesh is not required.
 
 ## Proposal
 
-This enhancement proposes a mechanism to allow users to specify their intent as to which clusters to connect and how to
-connect them. The default would still be a full mesh with a homogeneous cable driver.
+This enhancement proposes a mechanism to allow users to specify what clusters can connect and what cable
+driver to use to connect them. The default would still be a full mesh connectivity policy with a homogeneous
+cable driver.
 
-The standard mechanism in Kubernetes to specify intent is by creating a Kubernetes API resource whose effect is eventually
-realized into the cluster's desired state. To extend the Kubernetes API, one could either use the generic Kubernetes
-`ConfigMap` or use a custom resource definition (CRD). There's pros and cons to each but a CRD seems more suitable for
-this enhancement.
+The idea is that the user will be able to selectively deploy different cable types between clusters in
+a ClusterSet. They will be able to select a VXLAN cable type between clusters co-located in the same
+cloud (assuming they are in the same ClusterSet) as well as an IPSec cable between clusters in different
+clouds.
+
+In addition to supporting varying cable types between clusters in a ClusterSet, the user will also select
+which clusters to connect or not connect.
+
+> **_NOTE:_** The proposal assumes that connection between two clusters is symmetrical. If Cluster A is
+connected to Cluster B via a VXLAN cable type - then Cluster B is connected to Cluster A via a VXLAN cable
+type and not another cable type.
+
+The standard mechanism in Kubernetes to specify intent is by creating a Kubernetes API resource whose effect
+is eventually realized into the cluster's desired state. To extend the Kubernetes API, one could either use
+the generic Kubernetes `ConfigMap` or use a custom resource definition (CRD). There's pros and cons to each
+but a CRD seems more suitable for this enhancement.
 
 This enhancement will propose a single API for finer-grained connectivity and multiple cable driver support.
 
@@ -49,7 +62,7 @@ type ClusterConnectionPolicies struct {
 
     metav1.ObjectMeta `json:"metadata,omitempty"`
 
-    Spec ClusterConnectionPolicy `json:"spec"`
+    ConnectionPolicies []ClusterConnectionPolicySpec `json:"spec"`
 }
 
 type ClusterConnectionPolicySpec struct {
@@ -63,21 +76,13 @@ type ClusterConnectionPolicySpec struct {
     // Not used in combination with ClusterSelector.
     RightClusterSelector metav1.LabelSelector `json:"rightClusterSelector,omitempty"`
 
-    // ClusterSelector identifies the Cluster resources representing a subset of clusters.
-    // Not used in combination with LeftClusterSelector or RightClusterSelector.
-    // An empty selector indicates wildcard, ie matches any cluster.
-    ClusterSelector metav1.LabelSelector `json:"clusterSelector,omitempty"`
-
-    // Topology identifies the connection topology for the cable ends: full-mesh/point-to-point/client-server.
-    Topology `json:"topology,omitempty"`
-
    // Priority identifies the priority for the connection policy. Higher priorities are applied first.
     Priority  *int  `json:"priority,omitempty"`
 
     // ConnectionPolicy identifies the default connection policy if no policies are found: to connect or no-connect.
     ConnectionPolicy *string `json:"connectionPolicy,omitempty"`
 
-    Spec CableDriverSpec `json:"spec"`
+    CableDriverConfigs []CableDriverSpec `json:"spec"`
 }
 
 type CableDriverSpec struct {
@@ -85,58 +90,55 @@ type CableDriverSpec struct {
     Name string `json:"name"`
 
     // Options specifies key/value configuration parameters for the cable driver.
-    Options *v1.ConfigMap `json:"options,omitempty"`
+    CableOptions *v1.ConfigMap `json:"options,omitempty"`
 }
 ```
 
-The `ClusterConnectionPolicies` CR defines the criteria for selecting which cluster pairs/subsets can connect and associated optional
-configuration options to use for each cluster connection. To resolve the connectivity policy for a remote cluster's Endpoint,
-Submariner would:  
+The `ClusterConnectionPolicies` CR defines the criteria for selecting which cluster pairs/subsets can connect and
+associated optional configuration options to use for each cluster connection. To resolve the connectivity policy
+for a remote cluster's Endpoint, Submariner would:  
 
 - Search for a policy whose left and right label selectors match the corresponding Cluster resources of the local
-and remote Endpoints.
-- Search for a policy whose cluster label selector match the corresponding Cluster resources of the local and remote Endpoints.
+  and remote Endpoints.
 
-If any matching policy is found, the clusters are either:
+If any matching policy is found, the clusters are either (based on the ConnectionPolicy): connected or not connected.
 
-- connected (based on the connectionPolicy) according to the specified topology in the policy. Or
-- not connected (based on the connectionPolicy).
+If more than one matching policy is found, the priority field is used to determine which policy to use. If policies
+of equal priority are found it's assumed that these policies are to be applied in parallel.
 
-If more than one matching policy is found, the priority field is used to determine which policy to use. If policies of equal priority are found
-it's assumed that these policies are to be applied in parallel.
+If no matching policy is found, the default cable driver and default connection policy are used. This policy can be
+auto-created at broker deploy time and should specify the cable, the connection policy (to connect or not connect
+nodes that don't match predefined policies). If the default policy is not to connect nodes that don't match the
+selector criteria, then default cable is not needed.
 
-If no matching policy is found, the default cable driver and default connection policy are used. This policy can be auto-created at broker
-deploy time and should specify the cable, the connection policy (to connect or not connect nodes that don't match predefined
-policies) as well as the preferred topology. If the default policy is not to connect nodes that don't match the selector criteria, then
-a topology and default cable are not needed.
+> **_NOTE:_** In the case of multiple labels being specified, the selector will need to match all the labels.
+> Equality-based requirements will be supported. For e.g. labels such as `env: !production` will match any clusters
+> that aren't labelled with `env: production`.
 
-> **_NOTE:_**  the `ConnectionPolicy` field can also be used to specify policies for which clusters not to connect.
-> **_NOTE:_** In the case of multiple labels being specified, the selector will need to match all the labels. Equality-based requirements will
-be supported. For e.g. labels such as `env: !production` will match any clusters that aren't labelled with `env: production`.
+Defining separate resources for each policy and defining a priority or precedence field, allows Submariner to prioritize
+the connectivity and cable type between a pair of clusters.
 
-Defining separate resources for each policy and defining a priority or precedence field, allows Submariner to prioritize the
-connectivity and cable type between a pair of clusters.
-
-The `ClusterConnectionPolicies` resources would be created and maintained on the broker cluster and synced to each participating cluster.
+The initial `ClusterConnectionPolicies` resources would be created (at startup time) and maintained on the broker cluster
+and synced to each participating cluster. Policies can subsequently be created/deleted on a cluster and exported to the broker.
 A controller to reconcile updates to policies will need to be implemented in Submariner.
 
 ### Labelling clusters
 
-Clusters are defined as Custom Resources and can be labeled in the CR definition, or after creation using kubectl. A new parameter to label
-clusters at `subctl join` time could also be added for usability purposes.
+Clusters are defined as Custom Resources and can be labeled in the CRD. A new parameter to label clusters at
+`subctl join` time could also be added for usability purposes.
 
 ### Policy management with subctl
 
-The `ClusterConnectionPolicies` can be created as the Broker deployment through the extension of submariner configuration YAML to include
-parameters that support policy creation.
+The `ClusterConnectionPolicies` can be created at the Broker deployment through the extension of Submariner configuration
+YAML to include parameters that support policy creation.
 
-The `ClusterConnectionPolicies` can be created/managed after Broker deployment through kubectl or subctl using a command such as:
+The `ClusterConnectionPolicies` can be created/managed after Broker deployment through subctl using a command such as:
 
 ```cmd
-subctl connection-policy add | list | delete | export
+subctl connection-policy add | list | delete
 ```
 
-> **_NOTE:_** If a policy CR is created by a cluster admin using kubectl - it will need to be synced to the Broker.
+> **_NOTE:_** Policy CRs are automatically synced to the Broker on creation.
 
 #### subctl connection-policy commands
 
@@ -146,14 +148,12 @@ subctl connection-policy add | list | delete | export
 
 <!-- markdownlint-disable line-length -->
 | Flag                                  | Description
-|:--------------------------------------|:---------------------------------------------------------------------------------------------------|
+|:--------------------------------------|:--------------------------------------------------------------------------|
 | `--kubeconfig` `<string>`             | Absolute path(s) to the kubeconfig file(s) (default `$HOME/.kube/config`)
 | `--kubecontext` `<string>`            | Kubeconfig context to use
 | `--name` `<string>`                   | The name of this policy (used in the metadata)
 | `--left-cluster-selector` `<string>`  | Comma separated list of cluster labels for the label selector to use
 | `--right-cluster-selector` `<string>` | Comma separated list of cluster labels for the label selector to use
-| `--cluster-selector` `<string>`       | Comma separated list of cluster labels for the label selector to use
-| `--topology` `<string>`               | The topology to use: full-mesh/point-to-point/client-server
 | `--priority` `<value>`                | The priority of this policy
 | `--connection-policy` `<string>`      | The connection policy: connect/no-connect
 | `--cable-driver` `<string>`           | The name of the cable driver to use for this policy
@@ -170,16 +170,6 @@ subctl connection-policy add | list | delete | export
 | `--kubecontext` `<string>` | Kubeconfig context to use
 | `--name` `<string>`        | The name of the policy to delete
 
-##### `export`
-
-`subctl connection-policy export [flags]`
-
-| Flag                       | Description
-|:---------------------------|:-------------------------------------------------------------------------------|
-| `--kubeconfig` `<string>`  | Absolute path(s) to the kubeconfig file(s) (default `$HOME/.kube/config`)
-| `--kubecontext` `<string>` | Kubeconfig context to use
-| `--name` `<string>`        | The name of the policy to export
-
 ##### `list`
 
 `subctl connection-policy list [flags]`
@@ -193,7 +183,7 @@ Inspects the cluster and reports information about the detected connection polic
 
 #### Connection Policy Examples
 
-- we want to specify a default connection policy that uses a full-mesh topology with IPsec as the default cable driver.
+- we want to specify a default connection policy that uses "full-mesh" with IPsec as the default cable driver.
 
 ```yaml
 kind: ClusterConnectionPolicies
@@ -201,7 +191,6 @@ metadata:
   name: public-internet
 spec:
   connectionPolicy: connect
-  topology: full-mesh
   cableDriver:
     name: "ipsec"
   priority: 0
@@ -218,7 +207,7 @@ spec:
   priority: 0
 ```
 
-- We want to use specific cable drivers to connect clusters in a cluster set as shown in the image below. We
+- We want to use specific cable drivers to connect clusters in a ClusterSet as shown in the image below. We
 label the `Clusters` appropriately and define a number of policies with the appropriate label selectors.
 
 ![Finer grained connectivity example](./images/multiple_cables_ep.png)
@@ -232,7 +221,6 @@ spec:
     location: on-premise
   rightClusterSelector:
     location: on-premise
-  topology: point-to-point
   connectionPolicy: connect
   cableDriver:
     name:  "vxlan"
@@ -245,35 +233,40 @@ metadata:
   name: on-prem-to-cloud
 spec:
   leftClusterSelector:
-    location: on-premise
     env: production
   rightClusterSelector:
-    location: cloud
     env: production
-  topology: point-to-point
   connectionPolicy: connect
   cableDriver:
     name:  "ipsec"
   priority: 3
 ```
 
-> **_NOTE:_** we could have just used the `env: production` label in the example above.
-
 ```yaml
 kind: ClusterConnectionPolicies
 metadata:
   name: cloud-a-default
 spec:
-  clusterSelector:
+  leftClusterSelector:
     location: cloud
-  topology: full-mesh
+  rightClusterSelector:
+    location: cloud
   cableDriver:
     name:  "vxlan"
   priority: 3
 ```
 
-- We don't want to connect two clusters in a `ClusterSet`. We label the `Clusters` appropriately and define a policy with the appropriate
-label selectors.
+```yaml
+kind: ClusterConnectionPolicies
+metadata:
+  name: default-policy
+spec:
+  connectionPolicy: no-connect
+  priority: 0
+```
+
+- We don't want to connect two clusters in a `ClusterSet`. We label the `Clusters` appropriately and define
+  a policy with the appropriate label selectors.
 
 ```yaml
 kind: ClusterConnectionPolicies
@@ -290,9 +283,8 @@ spec:
   priority: 3
 ```
 
-- We only want certain clusters to access a database server in another cluster and no other clusters to connect to one another. We
-label the server and client `Clusters` appropriately and define a single policy with corresponding label selectors. Since there's
-no other policy to match client cluster pairs, they will not be connected.
+- We only want certain clusters to access a database service in another cluster and no client clusters to connect
+  to one another. We label the `server` and `client` `Clusters` appropriately and define the following policies:
 
 ```yaml
 apiVersion: v1
@@ -304,15 +296,29 @@ spec:
     database-role: server
   rightClusterSelector:
     database-role: client
-  topology: client-server
   connectionPolicy: connect
   cableDriver:
       name:  "vxlan"
    priority: 3
 ```
 
-- We want any cluster to access a database server in another cluster but no other clusters to connect. We label the server
-`Cluster` appropriately and define a single policy with the corresponding label selector and an empty selector to match all.
+```yaml
+apiVersion: v1
+kind: ClusterConnectionPolicies
+metadata:
+  name: client-policy
+spec:
+  leftClusterSelector:
+    database-role: client
+  rightClusterSelector:
+    database-role: client
+  connectionPolicy: no-connect
+   priority: 3
+```
+
+- We want any cluster to access a database service in a "server" cluster but no other clusters to connect. We label
+  the "server" `Cluster` appropriately and define the following policies, one with the corresponding label selectors and an
+  empty selector to match all and a default policy to not connect clusters.
 
 ```yaml
 apiVersion: v1
@@ -323,49 +329,55 @@ spec:
   leftClusterSelector:
     database-server: true
   rightClusterSelector:
-  topology: client-server
   connectionPolicy: connect
   cableDriver:
       name:  "vxlan"
    priority: 3
 ```
 
-### Multiple Cable driver configuration
+```yaml
+apiVersion: v1
+kind: ClusterConnectionPolicies
+metadata:
+  name: client-policy
+spec:
+  connectionPolicy: no-connect
+   priority: 3
+```
 
-The cable driver configuration in Submariner is relatively limited, as one can only select one driver to use at a time and there’s minimal
-support for customization of the configuration. The goals of this proposal for the extension of the cable driver configuration are:
+### Multiple simultaneous Cable driver configuration to support finer grained connectivity
+
+The cable driver configuration in Submariner only allows for the configuration of a single cable driver for a
+gateway. This will pose a challenge when allowing for varying (or multiple) cable types between clusters based
+on the defined connectivity policies. The goals of this proposal for the extension of the cable driver configuration
+are to:
 
 - Maintain backward compatibility with the current cable driver configuration
-- Create a custom cable driver configuration that allows for the setup of one, many or combined drivers. In addition, the configuration
-should allow for further customizations based on the selected driver(s).
+- Create an extended cable driver configuration that allows for the setup of one, many or combined drivers.
 
-Cable driver configuration parameters fall into two categories based on their scope:
+The proposed approach for additional Submariner cable driver configuration parameters is:
 
-- Gateway Pod Local - these are parameters that hold configuration parameters specific to each Pod (values vary from Pod to Pod).
-- Namespace Local - these are configuration parameters that you would like to share across a namespace (in this case the submariner-operator
-namespace).
-
-The proposed approach for additional submariner cable driver configuration parameters is:
-
-- To continue to use the existing environment variables injected into the Gateway Pod (with the exception of PSKs/secrets). These environment
-variables will come from the `submariner.io_submariners.yaml`.
-- To extend `submariner.io_submariners.yaml` with some new global parameters for cable driver configuration in a cluster set.
+- To continue to use the existing environment variables injected into the Gateway Pod (with the exception of PSKs/secrets).
+  These environment variables will come from the `Submariner.io_Submariners.yaml`.
+- To extend `Submariner.io_Submariners.yaml` with some new global parameters for multiple cable driver configurations
+  in a ClusterSet.
 - To use a volume mounted ConfigMap for more detailed cable driver configurations (as these may vary).
-- To use mounted secrets for parameters that need to be protected, e.g. the Pre-Shared Key (PSK) and to abandon the use of environment variables
-for secrets.
+- To use mounted secrets for parameters that need to be protected, e.g. the Pre-Shared Key (PSK) and to abandon the use of
+  environment variables for secrets.
 
-It's important to consider the benefit of volume mounted ConfigMaps and Secrets versus their use as environment variables injected into the Pod.
-With volume mounted maps/secrets, updates are automatically reflected in the Pod, so cable driver configurations can be updated and
-acted on without having to restart the Gateway Pod. The cable driver itself may need to be restarted which may have implications on existing/active
-traffic flows. The ConfigMap can be marked as `optional` to avoid blocking Pod startup. Environment variables are not updated after a ConfigMap
-or Secret update; The whole Pod will need to be restarted to deal with any configuration changes to environment variables.
+It's important to consider the benefit of volume mounted ConfigMaps and Secrets versus their use as environment variables
+injected into the Pod. With volume mounted maps/secrets, updates are automatically reflected in the Pod, so cable driver
+configurations can be updated and acted on without having to restart the Gateway Pod. The cable driver itself may need to
+be restarted which may have implications on existing/active traffic flows. The ConfigMap can be marked as `optional` to
+avoid blocking Pod startup. Environment variables are not updated after a ConfigMap or Secret update; The whole Pod will
+need to be restarted to deal with any configuration changes to environment variables.
 
 > **_NOTE:_** As secrets are used in Submariner it's also critical to ensure the Secrets are encrypted in ETCD.
 
 #### Multiple cable driver configuration
 
-The proposed global configuration parameter extensions to `submariner.io_submariners.yaml` to configure multiple cable drivers are listed
-in the following table:
+The proposed global configuration parameter extensions to `Submariner.io_Submariners.yaml` to configure multiple cable drivers
+are listed in the following table:
 
 <!-- markdownlint-disable line-length -->
 | Parameter name              | Description
@@ -376,7 +388,10 @@ in the following table:
 | cableDriverCustomConfigPath | The path to the mounted ConfigMap volume.
 <!-- markdownlint-enable line-length -->
 
-The specification additions to `submariner.io_submariners.yaml` are shown below:
+> **_NOTE:_** the existing `cableDriver` parameter when used in combination with the new parameters can be interpreted as the
+default/fallback driver.
+
+The specification additions to `Submariner.io_Submariners.yaml` are shown below:
 
 ```yaml
 cableDrivers:
@@ -398,9 +413,6 @@ cableDriverCustomConfigPath:
   type: string
 ```
 
-> **_NOTE:_** the existing `cableDriver` parameter when used in combination with the new parameters can be interpreted as the default/fallback
-driver.
-
 An example of a ConfigMap being used for additional VXLAN driver configuration is shown below:
 
 ```yaml
@@ -408,7 +420,7 @@ An example of a ConfigMap being used for additional VXLAN driver configuration i
 kind: ConfigMap
 metadata:
   name: cable-driver-config
-  namespace: submariner-operator
+  namespace: Submariner-operator
 data:
   CableCustomConfig: |
   vxlanID: 100

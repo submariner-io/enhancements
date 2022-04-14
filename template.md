@@ -1,4 +1,4 @@
-## Title of the enehancement proposal
+# Title of the enehancement proposal
 
 <!-- Add link to issue/epic if available -->
 
@@ -16,25 +16,34 @@
 if needed -->
 
 ### Pros
-<!-- Optional -->
+<!-- Benefits of going with this proposal  -->
 
 ### Cons
-<!-- Optional -->
+<!-- Drawbacks of going with this proposal. -->
 
 ### Backward Compatibility
 
-<!-- Optional. Any backward compatibility concerns -->
+<!-- Any backward compatibility concerns -->
 
-### Alternate Design
+### Alternatives
 
-<!-- Optional. Any alternate designs considered, if applicable. -->
+<!-- Any alternatives to consider with pros and cons, if applicable. -->
+
+## Work Items
+
+<!-- Optional. Breakup of different tasks that need to be done to implement this proposal. Can be skipped if an Epic already
+covers tasks to be done. -->
+
+## External Dependencies
+
+<!-- Any external dependencies this proposal may have -->
+
+## User Impact
+
+<!-- Optional. Any impact on users this change may have. -->
 
 ## Owners
 
 <!-- Optional. List of owners for this enhancement proposal and its implementation -->
 * Owner 1 Name <owner1@email.com>
 * Owner 2 Name <owner2@email.com>
-
-## Work Items
-<!-- Optional. Breakup of different tasks that need to be done to implement this proposal. Can be skipped if an Epic already
-covers tasks tobe done. -->

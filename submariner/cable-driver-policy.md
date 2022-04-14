@@ -73,9 +73,7 @@ deploy time.
 > that aren't labelled with `env: production`.
 
 The initial `CablePolicies` resources would be created (at startup time) and maintained on the broker cluster
-and synced to each participating cluster. Policies can subsequently be created/deleted on a cluster and will be
-automatically exported to the broker. A controller to reconcile updates to policies will need to be implemented in
-Submariner.
+and synced to each participating cluster.
 
 ### Labelling clusters
 

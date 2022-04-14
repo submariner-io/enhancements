@@ -5,8 +5,7 @@
 Submariner currently offers three cable drivers: VXLAN, IPSec or wireguard. However only one of these cable drivers
 is enabled across all the clusters in a ClusterSet; That is all clusters that join a broker must use the same cable
 driver. The goal of this proposal is to extend the current model to support the selection of different cable types
-between connected clusters. For example, an IPSec cable between public and private clouds but a VXLAN cable between
-the clusters in the same cloud.
+between connected clusters.
 
 There are use cases that involve supporting a mix of cable drivers or cable driver configurations within the same
 ClusterSet. For example, a ClusterSet could contain three clusters, two that are on-premise and the other
@@ -27,15 +26,20 @@ This enhancement will propose a single API for cable driver policy support using
 This following CRD is proposed:
 
 ```Go
-type CablePolicies struct {
+type ClusterConnectionPolicies struct {
     metav1.TypeMeta `json:",inline"`
 
     metav1.ObjectMeta `json:"metadata,omitempty"`
 
-    ConnectionPolicies []CablePolicySpec `json:"spec"`
+    ClusterConnectionPoliciesSpec `json:"spec"`
 }
 
-type CablePolicySpec struct {
+type ClusterConnectionPoliciesSpec struct {
+ 
+    Policies []ClusterConnectionPolicy `json:"policies,omitempty"`
+}
+
+type ClusterConnectionPolicy struct {
     // LeftClusterSelector identifies the Cluster resources representing the clusters on one end of a connection. An empty
     // selector indicates wildcard, ie matches any cluster.
     LeftClusterSelector metav1.LabelSelector `json:"leftClusterSelector,omitempty"`
@@ -45,14 +49,14 @@ type CablePolicySpec struct {
     RightClusterSelector metav1.LabelSelector `json:"rightClusterSelector,omitempty"`
 
     // Name of the cable driver implementation to use for this connection.
-    CableDriver string `json:"name"`
+    CableDriverName string `json:"CableDriverName"`
 
-    // Options specifies a ConfigMap to use for additional configuration parameters for the cable driver.
-    CableOptions *v1.ConfigMap `json:"options,omitempty"`
+    // CableOptions specifies a additional configuration parameters for the cable driver.
+    CableOptions map[string]string `json:"CableOptions,omitempty"`
 }
 ```
 
-The `CablePolicies` CR defines the criteria for selecting which cable driver to use to connect cluster pairs (or subsets)
+The `ClusterConnectionPolicies` CR defines the criteria for selecting which cable driver to use to connect cluster pairs (or subsets)
 and their associated (optional) configuration options. To resolve the connectivity policy for a remote cluster's Endpoint,
 Submariner would:
 
@@ -65,7 +69,7 @@ If no matching policy is found, the `default` cable driver policy is used. The `
 deploy time.
 
 > **_NOTE:_** In the case of multiple labels being specified, the selector will need to match all the labels.
-> Equality-based requirements will be supported. For e.g. labels such as `env: !production` will match any clusters
+> Inequality-based requirements will be supported. For e.g. labels such as `env: !production` will match any clusters
 > that aren't labelled with `env: production`.
 
 The initial `CablePolicies` resources would be created (at startup time) and maintained on the broker cluster
@@ -78,70 +82,15 @@ Submariner.
 Clusters are defined as Custom Resources and can be labeled in the CRD. A new parameter to label clusters at
 `subctl join` time could also be added for usability purposes.
 
-### Policy management with subctl
-
-The `CablePolicies` can be created at the Broker deployment through the extension of the Submariner-Operator to
-deploy CablePolicy CRDs, as well as the extension of Submariner configuration YAML to include parameters that
-support cable driver configuration.
-
-> **_NOTE:_** The default policy can be deduced from the existing Submariner configuration if it is not
-explicitly specified.
-
-The `CablePolicies` can be created/managed after Broker deployment through subctl using a command such as:
-
-```cmd
-subctl cable-policy add | list | delete
-```
-
-> **_NOTE:_** Policy CRs are automatically synced to the Broker on creation.
-
-#### subctl cable-policy commands
-
-##### `add`
-
-`subctl cable-policy add [flags]`
-
-<!-- markdownlint-disable line-length -->
-| Flag                                  | Description
-|:--------------------------------------|:--------------------------------------------------------------------------|
-| `--kubeconfig` `<string>`             | Absolute path(s) to the kubeconfig file(s) (default `$HOME/.kube/config`)
-| `--kubecontext` `<string>`            | Kubeconfig context to use
-| `--name` `<string>`                   | The name of this policy (used in the metadata)
-| `--left-cluster-selector` `<string>`  | Comma separated list of cluster labels for the label selector to use
-| `--right-cluster-selector` `<string>` | Comma separated list of cluster labels for the label selector to use
-| `--cable-driver` `<string>`           | The name of the cable driver to use for this policy
-| `--cable-config`  `<string>`          | The cable driver ConfigMap name
-<!-- markdownlint-enable line-length -->
-
-##### `delete`
-
-`subctl cable-policy delete [flags]`
-
-| Flag                       | Description
-|:---------------------------|:-------------------------------------------------------------------------------|
-| `--kubeconfig` `<string>`  | Absolute path(s) to the kubeconfig file(s) (default `$HOME/.kube/config`)
-| `--kubecontext` `<string>` | Kubeconfig context to use
-| `--name` `<string>`        | The name of the policy to delete
-
-##### `list`
-
-`subctl cable-policy list [flags]`
-
-Inspects the cluster and reports information about the detected cable policies.
-
-| Flag                         | Description
-|:-----------------------------|:----------------------------------------------------------------------------|
-| `--kubeconfig` `<string>`    | Absolute path(s) to the kubeconfig file(s) (default `$HOME/.kube/config`)
-| `--kubecontext` `<string>`   | Kubeconfig context to use
-
 #### Connection Policy Examples
 
 - we want to specify a default policy that uses IPsec as the default cable driver.
 
 ```yaml
-kind: CablePolicies
+kind: ClusterConnectionPolicies
 metadata:
   name: default
+  namespace: submariner-operator
 spec:
   cableDriver:
     name: "ipsec"
@@ -156,6 +105,7 @@ label the `Clusters` appropriately and define a number of policies with the appr
 kind: CablePolicies
 metadata:
   name: default
+  namespace: submariner-operator
 spec:
   cableDriver:
     name:  "vxlan"
@@ -165,6 +115,7 @@ spec:
 kind: CablePolicies
 metadata:
   name: on-prem-to-cloud
+  namespace: submariner-operator
 spec:
   leftClusterSelector:
     env: production
@@ -182,7 +133,7 @@ on the defined cable driver policies. The goals of this part of the proposal is 
 configuration to:
 
 - Maintain backward compatibility with the current cable driver configuration
-- Create an extended cable driver configuration that allows for the setup of one, many or combined drivers.
+- Create an extended cable driver configuration that allows for the setup of many drivers.
 
 The proposed approach for additional Submariner cable driver configuration parameters is:
 
@@ -190,14 +141,9 @@ The proposed approach for additional Submariner cable driver configuration param
   These environment variables will come from the `Submariner.io_Submariners.yaml`.
 - To extend `Submariner.io_Submariners.yaml` with some new global parameters for multiple cable driver configurations
   in a ClusterSet.
-- To use a volume mounted ConfigMap for more detailed cable driver configurations (as these may vary and should be shared across
-  gateway instances in the ClusterSet).
-- To use mounted secrets for parameters that need to be protected, e.g. the Pre-Shared Key (PSK) and to abandon the use of
-  environment variables for secrets.
 
 > **_NOTE:_** Modifications to cable driver configurations/policies may have implications on existing/active traffic flows
 > as the cable drivers may need to be restarted.
-> **_NOTE:_** The ConfigMap for cable configuration can be marked as `optional` to avoid blocking Pod startup.
 
 The proposed global configuration parameter extensions to `Submariner.io_Submariners.yaml` to configure multiple cable drivers
 are listed in the following table:
@@ -206,12 +152,9 @@ are listed in the following table:
 | Parameter name              | Description
 |:----------------------------|:----------------------------------------------------------------------------|
 | cableDrivers                | An array of strings listing the drivers to configure as separate cables.
-| combinedCableDrivers        | An array of strings listing the drivers to configure as a combined cable e.g vxlan + IPSEC in transport mode
-| cableDriverCustomConfig     | The name of the ConfigMap for custom driver configuration.
-| cableDriverCustomConfigPath | The path to the mounted ConfigMap volume.
 <!-- markdownlint-enable line-length -->
 
-> **_NOTE:_** the existing `cableDriver` parameter when used in combination with the new parameters can be interpreted as the
+> **_NOTE:_** the existing `cableDriver` parameter when used in combination with the new parameter can be interpreted as the
 default/fallback driver.
 
 The specification additions to `Submariner.io_Submariners.yaml` are shown below:
@@ -221,30 +164,4 @@ cableDrivers:
   items:
     type: string
   type: array
-combinedCableDrivers:
-  items:
-    type: string
-  type: array
-cableDriverCustomConfig:
-  properties:
-    configMapName:
-      type: string
-    namespace:
-      type: string
-  type: object
-cableDriverCustomConfigPath:
-  type: string
-```
-
-An example of a ConfigMap being used for additional VXLAN driver configuration is shown below:
-
-```yaml
-​​apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cable-driver-config
-  namespace: Submariner-operator
-data:
-  CableCustomConfig: |
-  vxlanID: 100
 ```

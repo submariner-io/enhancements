@@ -14,7 +14,7 @@ unencrypted connections, as they’re connected by a private link, to avoid the 
 
 ## Proposal
 
-This enhancement proposes a new policy to allow users to selectively deploy different cable types between clusters
+This enhancement proposes a new policy CRD to allow users to selectively deploy different cable types between clusters
 in a ClusterSet. The proposal assumes that connection between two clusters is symmetrical. If Cluster A is connected
 to Cluster B via a VXLAN cable type - then Cluster B is connected to Cluster A via a VXLAN cable type and not another
 cable type.
@@ -26,20 +26,18 @@ This enhancement will propose a single API for cable driver policy support using
 This following CRD is proposed:
 
 ```Go
-type ClusterConnectionPolicies struct {
+type ClusterConnectionPolicy struct {
     metav1.TypeMeta `json:",inline"`
 
     metav1.ObjectMeta `json:"metadata,omitempty"`
 
-    ClusterConnectionPoliciesSpec `json:"spec"`
+    ClusterConnectionPolicySpec `json:"spec"`
+
+    // Status is the current state of the ClusterConnectionPolicy.
+    Status ClusterConnectionPolicyStatus `json:"status,omitempty"`
 }
 
-type ClusterConnectionPoliciesSpec struct {
- 
-    Policies []ClusterConnectionPolicy `json:"policies,omitempty"`
-}
-
-type ClusterConnectionPolicy struct {
+type ClusterConnectionPolicySpec struct {
     // LeftClusterSelector identifies the Cluster resources representing the clusters on one end of a connection. An empty
     // selector indicates wildcard, ie matches any cluster.
     LeftClusterSelector metav1.LabelSelector `json:"leftClusterSelector,omitempty"`
@@ -50,15 +48,11 @@ type ClusterConnectionPolicy struct {
 
     // Name of the cable driver implementation to use for this connection.
     CableDriverName string `json:"CableDriverName"`
-
-    // CableOptions specifies a additional configuration parameters for the cable driver.
-    CableOptions map[string]string `json:"CableOptions,omitempty"`
 }
 ```
 
-The `ClusterConnectionPolicies` CR defines the criteria for selecting which cable driver to use to connect cluster pairs (or subsets)
-and their associated (optional) configuration options. To resolve the connectivity policy for a remote cluster's Endpoint,
-Submariner would:
+The `ClusterConnectionPolicy` CR defines the criteria for selecting which cable driver to use to connect cluster pairs (or subsets).
+To resolve the connectivity policy for a remote cluster's Endpoint, Submariner would:
 
 - Search for a policy whose left and right label selectors match the corresponding Cluster resources of the local
   and remote Endpoints.
@@ -72,8 +66,50 @@ deploy time.
 > Inequality-based requirements will be supported. For e.g. labels such as `env: !production` will match any clusters
 > that aren't labelled with `env: production`.
 
-The initial `CablePolicies` resources would be created (at startup time) and maintained on the broker cluster
-and synced to each participating cluster.
+The initial `ClusterConnectionPolicy` resources would be created and maintained on the broker cluster and synced to each
+participating cluster.
+
+Submariners `EndpointSpec` should be extended to include a map that identifies of the policies used to connect to clusters. The key
+is the remote ClusterID and the value is the policy name.
+
+New parameters `Backends` and `BackendsConfig` would also need to be added to the `EndpointSpec`.
+
+> **_NOTE:_** `Backend` and `BackendConfig` could be deprecated in favour of the new `EndpointSpec` parameters.
+
+```go
+type EndpointSpec struct {
+  // +kubebuilder:validation:MaxLength=63
+  // +kubebuilder:validation:MinLength=1
+  ClusterID string `json:"cluster_id"`
+  CableName string `json:"cable_name"`
+  // +optional
+  HealthCheckIP      string            `json:"healthCheckIP,omitempty"`
+  Hostname           string            `json:"hostname"`
+  Subnets            []string          `json:"subnets"`
+  PrivateIP          string            `json:"private_ip"`
+  PublicIP           string            `json:"public_ip"`
+  NATEnabled         bool              `json:"nat_enabled"`
+  Backend            string            `json:"backend"`
+  BackendConfig      map[string]string `json:"backend_config,omitempty"`
+  // Backends lists all the enabled backends on an endpoint: vxlan, ipsec ...
+  Backends           []string          `json:"backends"`
+  // Backends config is a map listing the configuration for a particular backend:
+  // e.g. 
+  //    backends_config:
+  //      vxlan:
+  //        Natt - Discovery - Port:  4490
+  //        Preferred - Server:       false
+  //        Udp - Port:               4500
+  BackendsConfig     map[string]map[string]string `json:"backends_config,omitempty"`
+  // ConnectionPolicies is a map listing the cluster connection policies applied
+  // e.g. 
+  //    connection_policies:
+  //      cluster1:
+  //        backend:  vxlan
+  //        policy:   default
+  ConnectionPolicies map[string]map[string]string `json:"connection_policies,omitempty"`
+}
+```
 
 ### Labelling clusters
 
@@ -82,10 +118,10 @@ Clusters are defined as Custom Resources and can be labeled in the CRD. A new pa
 
 #### Connection Policy Examples
 
-- we want to specify a default policy that uses IPsec as the default cable driver.
+- We want to specify a default policy that uses IPsec as the default cable driver.
 
 ```yaml
-kind: ClusterConnectionPolicies
+kind: ClusterConnectionPolicy
 metadata:
   name: default
   namespace: submariner-operator
@@ -100,7 +136,7 @@ label the `Clusters` appropriately and define a number of policies with the appr
 ![Finer grained connectivity example](./images/multiple_cables_ep.png)
 
 ```yaml
-kind: CablePolicies
+kind: ClusterConnectionPolicy
 metadata:
   name: default
   namespace: submariner-operator
@@ -110,56 +146,15 @@ spec:
 ```
 
 ```yaml
-kind: CablePolicies
+kind: ClusterConnectionPolicy
 metadata:
   name: on-prem-to-cloud
   namespace: submariner-operator
 spec:
   leftClusterSelector:
-    env: production
+    env: cloud
   rightClusterSelector:
-    env: production
+    env: on-premise
   cableDriver:
     name:  "ipsec"
-```
-
-### Cable driver configuration
-
-The cable driver configuration in Submariner only allows for the configuration of a single cable driver for a
-gateway. This will pose a challenge when allowing for varying (or multiple) cable types between clusters based
-on the defined cable driver policies. The goals of this part of the proposal is to extend the cable driver
-configuration to:
-
-- Maintain backward compatibility with the current cable driver configuration
-- Create an extended cable driver configuration that allows for the setup of many drivers.
-
-The proposed approach for additional Submariner cable driver configuration parameters is:
-
-- To continue to use the existing environment variables injected into the Gateway Pod (with the exception of PSKs/secrets).
-  These environment variables will come from the `Submariner.io_Submariners.yaml`.
-- To extend `Submariner.io_Submariners.yaml` with some new global parameters for multiple cable driver configurations
-  in a ClusterSet.
-
-> **_NOTE:_** Modifications to cable driver configurations/policies may have implications on existing/active traffic flows
-> as the cable drivers may need to be restarted.
-
-The proposed global configuration parameter extensions to `Submariner.io_Submariners.yaml` to configure multiple cable drivers
-are listed in the following table:
-
-<!-- markdownlint-disable line-length -->
-| Parameter name              | Description
-|:----------------------------|:----------------------------------------------------------------------------|
-| cableDrivers                | An array of strings listing the drivers to configure as separate cables.
-<!-- markdownlint-enable line-length -->
-
-> **_NOTE:_** the existing `cableDriver` parameter when used in combination with the new parameter can be interpreted as the
-default/fallback driver.
-
-The specification additions to `Submariner.io_Submariners.yaml` are shown below:
-
-```yaml
-cableDrivers:
-  items:
-    type: string
-  type: array
 ```

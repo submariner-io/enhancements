@@ -32,9 +32,6 @@ type ClusterConnectionPolicy struct {
     metav1.ObjectMeta `json:"metadata,omitempty"`
 
     ClusterConnectionPolicySpec `json:"spec"`
-
-    // Status is the current state of the ClusterConnectionPolicy.
-    Status ClusterConnectionPolicyStatus `json:"status,omitempty"`
 }
 
 type ClusterConnectionPolicySpec struct {
@@ -93,7 +90,7 @@ type EndpointSpec struct {
   BackendConfig      map[string]string `json:"backend_config,omitempty"`
   // Backends lists all the enabled backends on an endpoint: vxlan, ipsec ...
   Backends           []string          `json:"backends"`
-  // Backends config is a map listing the configuration for a particular backend:
+  // BackendsConfig is a map listing the configuration for a particular backend:
   // e.g. 
   //    backends_config:
   //      vxlan:

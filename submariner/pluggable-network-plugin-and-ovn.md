@@ -1,6 +1,6 @@
 ## Add support for OVN with pluggable network-plugin support
 
-[submariner#778](https://github.com/submariner-io/submariner/issues/778)
+[Submariner#778](https://github.com/submariner-io/submariner/issues/778)
 
 ## Summary
 
@@ -21,7 +21,7 @@ automatic [handling of the IPPool entries](https://submariner.io/operations/depl
 Re-architect Submariner route-agent in a way such that different network-plugin
 implementations can be supported. The re-architecture should create a re-usable library
 which other microservices including the new `submariner-network-plugin-sync` could
-make use of for handling common submariner events.
+make use of for handling common Submariner events.
 
 Those drivers would be notified of different events like:
 
@@ -85,7 +85,7 @@ the dataplane they talk to the network plugin.
 
 #### OVN-Kubernetes integration
 
-##### submariner-network-plugin-sync
+##### `submariner-network-plugin-sync`
 
 [OVN-Kubernetes](https://github.com/ovn-org/ovn-kubernetes) is a network-plugin for K8s
 that integrates with [OVN](https://github.com/ovn-org/ovn).
@@ -94,10 +94,10 @@ OVN has two databases, OVN NorthDB , and OVN South DB. OVN-Kubernetes creates an
 `ovn_cluster_router`, two virtual switches per node, and an additional router `GR_xxx`
 per node.
 
-In our solution we create an aditional virtual submariner router in OVN, connected
+In our solution we create an aditional virtual Submariner router in OVN, connected
 via a switch to the ovn_cluster_router, and then to the external network.
 
-##### submariner-route-agent
+##### `submariner-route-agent`
 
 In addition to the OVN NBDB handling, we will need to insert additional routes in every
 host via the route-agent, in a similar way to what we do for the kubeproxy-iptables
@@ -311,12 +311,12 @@ of database/object synchronization with the existing network plugin.
 #### Work items
 
 * [ ] Define an initial architecture interface for the network plugin drivers
-* [ ] Improve the submariner-operator to pass down the network-plugin type down
+* [ ] Improve the Submariner Operator to pass down the network-plugin type down
       to the route-agent.
 * [ ] Refactor the `submariner-route-agent` event handling into a library which calls the
       new driver architecture and can be used in other similar microservices.
 * [ ] Create the `submariner-network-plugin-sync` binary and images,
-* [ ] Improve the submariner-operator to create a separate deployment for
+* [ ] Improve the Submariner Operator to create a separate deployment for
       `submariner-network-plugin-sync` where the network plugin driver requires it,
       and pass down the type of network-plugin to the `submariner-network-plugin-sync`
       as well as the `submariner-route-agent`.

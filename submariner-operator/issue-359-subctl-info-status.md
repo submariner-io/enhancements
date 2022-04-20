@@ -1,6 +1,6 @@
 # Add more capabilities to check status from subctl
 
-[submariner-operator#359](https://github.com/submariner-io/submariner-operator/issues/359)
+[Submariner-operator#359](https://github.com/submariner-io/submariner-operator/issues/359)
 
 ## Summary
 

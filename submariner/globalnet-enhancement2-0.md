@@ -352,7 +352,7 @@ Clusters with non-overlapping CIDRs and use Vanilla Submariner instead of Global
 6. [Allocate globalIP only to exported Services.](https://github.com/submariner-io/submariner/issues/720)
 7. [Support Headless Services and program ingress/egress rules for the backend Pods.](https://github.com/submariner-io/submariner/issues/732)
 8. This is a good to have internal enhancement and does not modify the user experience.
-   [Avoid dependency on the IPtable chains programmed by IPtables kube-proxy driver.](https://github.com/submariner-io/submariner/issues/1166)
+   [Avoid dependency on the IPtable chains programmed by iptables kube-proxy driver.](https://github.com/submariner-io/submariner/issues/1166)
 9. Implement necessary unit tests for each of the use-cases.
 10. [Implement necessary e2e tests to validate various use-cases.](https://github.com/submariner-io/submariner/issues/1167)
 11. [Update documentation.](https://github.com/submariner-io/submariner-website/issues/455)

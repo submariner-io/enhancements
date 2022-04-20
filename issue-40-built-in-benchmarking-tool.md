@@ -1,6 +1,6 @@
 ## Add Built-in Benchmarking Tool
 
-[submariner-operator#494](https://github.com/submariner-io/submariner-operator/issues/494)
+[Submariner-operator#494](https://github.com/submariner-io/submariner-operator/issues/494)
 
 ## Summary
 
@@ -11,7 +11,8 @@ the system.
 ## Proposal
 
 Add a new ability to have a built-in benchmark tool.
-Implement a new Subctl command that will use iperf/netperf internally to benchmark the throughput and round trip latency between two nodes.
+Implement a new `subctl` command that will use iperf/netperf internally to benchmark the throughput and round trip latency between two
+nodes.
 
 Scheduling server and client can be placed within the same cluster or spread across multiple clusters.
 The user can specify source and destination nodes via node labels.
@@ -54,7 +55,7 @@ The backend for throughput tests will be iperf. The default params that will be 
 Source code should go into `submariner-operator`.
 There is going to be a dependency on the nettest image from Shipyard, which will need to have the necessary tools.
 
-### Subctl command
+### `subctl` command
 
 ```console
 subctl benchmark throughput <kubeconfig1> <kubeconfig2>

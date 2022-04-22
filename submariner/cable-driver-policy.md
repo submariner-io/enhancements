@@ -160,8 +160,7 @@ type Connection struct {
 
 The detailed connection information for a Gateway is currently maintained in the Gateway and Submariner CRs,
 however when the number of clusters grows to a large scale these could be difficult to parse. It maybe preferable
-to maintain connection information in a separate set if `ClusterConnection` CRs. Maintaining this info in separate
-set of CRs could be useful in the case of:
+to maintain connection information in a separate set of `ClusterConnection` CRs. This could be useful in the case of:
 
 - Gateway failover, so the new gateway doesn't need to do the same work again to build a connection definition. Or
 - In the case of `ClusterConnectionPolicy` updates. A Gateway could quickly cycle through the connection policies its

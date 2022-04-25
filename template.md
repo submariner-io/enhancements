@@ -1,4 +1,4 @@
-# Title of the enehancement proposal
+# Title of the enhancement proposal
 
 <!-- Add link to issue/epic if available -->
 
@@ -28,11 +28,6 @@ if needed -->
 ### Alternatives
 
 <!-- Any alternatives to consider with pros and cons, if applicable. -->
-
-## Work Items
-
-<!-- Optional. Breakup of different tasks that need to be done to implement this proposal. Can be skipped if an Epic already
-covers tasks to be done. -->
 
 ## External Dependencies
 

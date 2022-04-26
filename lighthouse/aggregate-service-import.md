@@ -23,14 +23,13 @@ There are changes required in Lighthouse's handling of `EndpointSlices` before s
   if needed. The service VIPs from the exporting clusters should be stored in `EndpointSlices`,
   with a separate `EndpointSlice` per exporting cluster.
 
-It is worth noting that:
-
-- Headless services already have `EndpointSlices` containing the correct pod IP addresses, and contain
-  no VIP information in the multiple `ServiceImports`. A merged  `ServiceImport` for headless
-  services would comprise a merge of the port definitions in those `ServiceImports`.
-
 - The current GlobalNet implementation exports `EndpointSlices` for normal services that contain
-  pod IP addresses from the originating cluster.
+  pod IP addresses from the originating cluster. The `EndpointSlice` purpose will need to change
+  to contain the Globalnet service VIP for the originating cluster.
+
+Headless services already have `EndpointSlices` containing the correct pod IP addresses, and
+contain no VIP information in the multiple `ServiceImports`. A merged `ServiceImport` for
+headless services just needs to list the originating clusters in its status.
 
 ## Proposal
 
@@ -44,32 +43,24 @@ can be achieved by allowing the first exporting cluster to create a `ServiceImpo
 subsequent exporting clusters to reuse it, assuming they have matching port lists.
 
 1. First exporting cluster creates a `ServiceImport` on the broker.
-1. Subsequent exporting clusters reuse the existing `ServiceImport`.
+1. Subsequent exporting clusters reuse the existing `ServiceImport`, updating the status to
+   include the id of the exporting cluster.
 1. Exporting clusters create and sync `EndpointSlices` to the broker with the service VIP and a
    `multicluster.kubernetes.io/service-name` label that matches the `ServiceImport`.
 1. All clusters sync the `ServiceImport` and `EndpointSlices` from the broker.
 
-Looking at the `ServiceImport` merging in more detail, the MCS specification asks for all port
-definitions from the `ServiceExports` to be combined in the merged `ServiceImport`. This means
-that an exporting cluster would need to merge its port definitions into the `ServiceImport`.
-Conversely, when removing a `ServiceExport` any merged port definitions would need to be
-removed. However an exporting cluster only has visibility of its local `ServiceExport` so cannot
-unmerge with the information available locally.
-
-Note: It is an open question what behaviour is expected when a connection request for service
-port is directed to a cluster that does not expose that port.
-
-The notion that services are equivalent when they have matching name and namespace but different
-port lists seems problematic. It is preferable to set `ServiceExport` status to conflict for any
-differences between the exported services. By choosing to be strict about service equivalence,
-we avoid having to perform any port list merging or unmerging on the `ServiceImport`.
+Submariner will take a strict approach to service equivalence where the namespace, name and port
+lists must match in order for exported services to be considered equivalent. This is stricter
+than the MCS specification and is discussed further below in "Deviation from MCS". A
+`ServiceExport` with the same namespace and name as an existing `ServiceImport` but which does
+not meet the strict equivalence critera will have its status set to conflict.
 
 ### DNS Resolution
 
 Lighthouse currently implements DNS resolution by round-robin load balancing between the
 `ServiceImports` that match the namespace/name pair. With a merged `ServiceImport`, the
-per-cluster service VIPs are stored on the `EndpointSlices`. DNS resolution will select from the
-`EndpointSlices` associated with the `ServiceImport` instead of using `ServiceImports`
+per-cluster service VIPs will be stored on the `EndpointSlices`. DNS resolution will select from
+the `EndpointSlices` associated with the `ServiceImport` instead of using `ServiceImports`
 directly.
 
 DNS Resolution behaviour for headless services will remain unchanged.
@@ -79,6 +70,10 @@ DNS Resolution behaviour for headless services will remain unchanged.
 Given the way that Submariner operates, there is no need to assign a Service VIP to a
 `ServiceImport` in the importing clusters. This means that `ServiceImports` can always have an
 empty IP address attribute, like they do for headless services today.
+
+In future it would be possible to allocate a Service VIP to each `ServiceImport` and implement
+load balancing across the exporting clusters. This would allow more sophisticated load balancing
+than is possible with the DNS resolver.
 
 ### Adding a ServiceExport
 
@@ -108,7 +103,31 @@ Here are the steps for removing a `ServiceExport` from a cluster:
 The `EndpointSlice` that gets created by an exporting cluster will contain one of:
 
 - The service VIP (or Globalnet service VIP) for ClusterIP services
-- The list of POD IPs (or Globalnet POD IPs) for Headless services
+- The list of pod IPs (or Globalnet pod IPs) for Headless services
+
+When an exporting cluster has no pods backing an exported service, the EndpointSlice for the
+cluster will be withdrawn. This is to ensure that requests do not get directed to clusters that
+have no pods to service the request.
+
+## Deviation From MCS
+
+Looking at the `ServiceImport` merging in more detail, the MCS specification asks for all port
+definitions from the `ServiceExports` to be combined in the merged `ServiceImport`. This means
+that an exporting cluster would need to merge its port definitions into the `ServiceImport`.
+Conversely, when removing a `ServiceExport` any merged port definitions would need to be
+removed. However an exporting cluster only has visibility of its local `ServiceExport` so cannot
+unmerge with the information available locally.
+
+The notion that services are equivalent when they have matching name and namespace but different
+port lists seems problematic. It is an open question what behaviour is expected when a
+connection request for service port is directed to a cluster that does not expose that port. It
+is preferable to set `ServiceExport` status to conflict for any differences between the exported
+services.
+
+By choosing to be strict about service equivalence, we can avoid the following issues:
+
+- Performing any port list merging or unmerging on the `ServiceImport`.
+- Preventing a request from getting forwarded to a cluster that does not serve a specific port.
 
 ## Alternative Approaches
 

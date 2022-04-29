@@ -310,6 +310,13 @@ Spec:
     10.1.0.0/16
 ```
 
+#### Port numbers open issue
+
+When enabling multiple cable drivers, it will be necessary to separate the port numbers used by the drivers. Currently,
+port 4490 is used for NAT-T Discovery, and port 4500 is used for inter-cluster traffic. For NAT-T Discovery ports in the
+range 4489-4499 could be used as these are [unassigned](https://www.speedguide.net/port.php?port=4490). For VXLAN, it maybe
+useful to use the default port number 4789 (for inter-cluster traffic) and leave the 4500 port number for IPSec traffic.
+
 ### Submariner Cable Driver Configuration
 
 It's expected that on Gateway startup, the `ClusterConnectionPolicy` CRs imported from the broker will be

@@ -2,113 +2,45 @@
 
 ## Summary
 
-Submariners current security arrangements, namely using an identical pre-shared key in
-all deployments will fail security assessment in most environments which have to comply
+Submariner's current security arrangements, namely using an identical pre-shared key in
+all clusters in a ClusterSet, will fail security assessment in most environments which have to comply
 with a pre-existing security policy and rules on using VPNs in general and IPSEC in particular.
 
-In order to comply the minimum enhancement that needs to be implemented is the use
-of X509 certificates per Gateway. This will require the introduction of a Certificate Authority
+In order to comply, the minimum enhancement that needs to be implemented is the use
+of X.509 certificates per Gateway. This will require the introduction of a Certificate Authority
 (CA) that's capable of signing Certificate Signing Requests (CSRs) for Gateways in the
-`ClusterSet`. This CA will be serviced by a Syncer that will act as a proxy between the Certificate
-Requester and the CA itself.
+`ClusterSet`. This CA, a set of controllers (one to authorize and another to sign CSRs),
+will be serviced by a Syncer that will act as a proxy between the Certificate requester and
+the CA itself.
 
 ## Proposal
 
-This enhancement proposes to use a `ClusterSet` wide `Certificate Authority` and a `Syncer`
-that are co-located with the Broker to service Gateway. At a high level this requires:
+This enhancement proposes to use a `ClusterSet`-wide `Certificate Authority` that is co-located
+with the Broker to service Gateway CSRs. The `Certificate Authority` consists of two controllers:
 
-* A Certificate Authority that can be used across the ClusterSet. Ideally this authority resides
-on the Broker node.
-* A CA_CSR_Syncer on the Broker Node.
-* A new CRD to encapsulate a Submariner CSR (towards this centralized CA), and the result (towards
-the Gateway). Gateways will fill the CRD with relevant information (a base64 encoded string of a PEM
-encoded certificate request) and publish the CR to the Kube API.
-* A GW_CSR_Syncer on the gateway Node.
+- A CSR `Approval controller` that checks the identity of the CSR requester and
+- A CSR `Signing controller` that signs approved CSRs. The signerName for Gateway CSRs will be
+`submariner.com/broker-signer`.
 
-The general idea is that, when a Broker is installed, a CA and CA_CSR_Syncer are also installed on
-the Broker node. Then, when a Submariner gateway starts up it will launch a GW_CSR_Syncer, it will
-also create a CSR, base64 encode it and send it via a Submariner CSR CRD towards the Broker node CA.
-When the CA_CSR_Syncer picks up the Submariner CSR resource, it will issue a CA CSR towards the CA.
-Monitor the result of the CA CSR and publish the result back to the original Gateway via the Broker
-(by updating the original CSR CRD). The details of the design are shown in the upcoming sections.
+A `Syncer` is also needed to synchronize CSRs to/from the Broker.
 
 ## Design Details
 
-### CA Deployment
+A root certificate is generated for the `Certificate Authority` signer that gets passed to all the
+clusters. The Broker `ca.crt` will be reused as the Signers root certificate.
 
-The following diagram shows the various component needed for the central CA.
+At Gateway startup, the Gateway will install the central CA cert, generate a private key and a CSR
+with the `signerName: submariner.com/broker-signer`.
 
-![CA Deployment](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/maryamtahhan/enhancements/feat_central_cert_manager/submariner/images/CA-deploy.puml)
+If the request is from a remote node (to the Broker), a local Syncer will synchronize the CSR to the Broker
+node. The Approval Controller verifites that the request is from a valid cluster in the ClusterSet and the
+Signing controller signs the authorized CSR and updates the `status.certificate` Field. The Syncer on the
+Broker node will then propagate the issued CSR back to the originating cluster. The Syncer on the originating
+cluster will pull in the new Certificate for the Gateway and verify the signer. The Gateway then uses that
+certificate as part of its IPSec Configuration.
 
-### CA Issue Certificate Example
+## References
 
-> **_NOTE:_**
->
-> * For Simplicity purposes the role of Admiral in the diagrams below has been
-> collapsed into the CSR_Syncers.
-
-![CA Issue Certificate Example](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/maryamtahhan/enhancements/feat_central_cert_manager/submariner/images/CA-operation.puml)
-
-### Submariner CSR CRD
-
-```Go
-type SubmarinerCSRs struct {
-    metav1.TypeMeta `json:",inline"`
-    metav1.ObjectMeta `json:"metadata,omitempty"`
-    
-    // CSR towards the Submariner CA.
-    CSRSpec SubmarinerCSRSpec `json:"spec"`
-
-    // Result of CSR.
-    CSRStatusSpec SubmarinerCSRStatus `json:"spec"`
-}
-
-// SubmarinerCSRSpec defines the CSR for the Submariner Gateway
-type SubmarinerCSRSpec struct {
-    // The requested 'duration' (i.e. lifetime) of the Certificate.
-    Duration *metav1.Duration
-
-    // The PEM-encoded x509 certificate signing request to be submitted to the
-    // CA for signing.
-    Request []byte
-
-    // Usages is the set of x509 usages that are requested for the certificate.
-    // "signing", "digital signature", "key agreement"...
-    // details can be found here: https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.3
-    // and https://github.com/cert-manager/cert-manager/blob/master/internal/apis/certmanager/types.go#L159
-    Usages []string
-}
-
-// SubmarinerCSRStatus defines the status of CertificateRequest and
-// resulting signed certificate.
-type SubmarinerCSRStatus struct {
-    // Status of the request (`Ready`, `InvalidRequest`, `Approved`, `Denied`).
-    Status string
-
-    // The PEM encoded x509 certificate resulting from the certificate
-    // signing request. Empty if the Status is InvalidRequest/Denied.
-    Certificate []byte
-
-    // The PEM encoded x509 certificate of the Certificate Authority.
-    CA []byte
-}
-```
-
-### CA CSR CRD
-
-The Proposed CA project to leverage is [cert-manager](https://cert-manager.io/docs/) Here is an
-example of the [CA CSR](https://cert-manager.io/docs/concepts/certificaterequest/) and also [here](https://github.com/cert-manager/cert-manager/blob/master/internal/apis/certmanager/v1alpha2/types_certificaterequest.go#L56)
-
-On the Broker the CA_CSR_Syncer will:
-
-* Read incoming Submariner CSR resources from Gateways.
-* Translate the Submariner CRs to CA CSR resources.
-* Submit the CA CSR to the CA.
-* Read the resulting certificate request that contains the signed Certificate.
-* Update the Submariner CSR resource with the Signed Certificate (alternatively - this could be a
-separate Certificate CRD).
-* Propagate the Signed Certificate back to the originating GW (leveraging labels and
-annotations) using the Broker.
-
-Here are the details for [CA installation](https://cert-manager.io/docs/installation/) and
-[Issuer configuration](https://cert-manager.io/docs/configuration/ca/)
+- [CSR Approving Controller](https://github.com/open-cluster-management-io/addon-framework/blob/0379f4992da025688d78023fafa7a11c07be4714/pkg/addonmanager/controllers/certificate/csrapprove.go#L39)
+- [CSR Signing Controller](https://github.com/open-cluster-management-io/addon-framework/blob/0379f4992da025688d78023fafa7a11c07be4714/pkg/addonmanager/controllers/certificate/csrsign.go)
+- [Example Approver and Signer Functions](https://github.com/open-cluster-management-io/addon-framework/blob/f2fc48e63c4cdadcce3881be148ee10bf85c6fb7/pkg/utils/csr_helpers.go#L29)

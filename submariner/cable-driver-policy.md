@@ -1,5 +1,9 @@
 # Cable Driver Policy Support
 
+## Status
+
+In progress.
+
 ## Summary
 
 Submariner currently offers three cable drivers: VXLAN, IPSec or wireguard. However only one of these cable drivers
@@ -44,12 +48,7 @@ type ClusterConnectionPolicySpec struct {
     RightClusterSelector metav1.LabelSelector `json:"rightClusterSelector,omitempty"`
 
     // Name of the cable driver implementation to use for this connection.
-    CableDriver string `json:"CableDriver"`
-
-    // +optional
-    // NoConnectOnConflict defines the intention to fallback to no connection if there's a policy conflict
-    // If defined - should be part of the default policy
-    NoConnectOnConflict bool `json:"NoConnectOnConflict"`
+    CableDriver string `json:"cableDriver"`
 }
 ```
 
@@ -58,37 +57,30 @@ subsets). To resolve the connectivity policy for a remote cluster's Endpoint, Su
 
 - Search for a policy whose left and right label selectors match the corresponding Cluster resources of the local and remote
   Endpoints.
+- If one matching policy is found, the clusters are connected using the cable driver specified in the cable driver policy.
+- If no matching policy is found, the `default` cable driver policy is used. The `default` policy can be auto-created at broker
+  deploy time.
+- If more than one matching policy is found, the clusters are **not connected** and the connection status between a pair of clusters
+  is marked as `conflict`.
 
-> **_NOTE:_** In the case of multiple labels being specified, the selector will need to match all the labels.
-> Inequality-based requirements will be supported. For e.g. labels such as `env: !production` will match any clusters
-> that aren't labelled with `env: production`.
+The `ClusterConnectionPolicy` resources are created and maintained on the broker cluster and synced to each cluster in the `ClusterSet`.
 
-If any matching policy is found, the clusters are connected using the cable driver specified in the cable driver policy.
+#### `EndpointSpec` open issue
 
-If no matching policy is found, the `default` cable driver policy is used. The `default` policy can be auto-created at broker
-deploy time.
+Submariners `EndpointSpec` CR contains the `Backend` and `BackendConfig`, which only reflect a single cable driver. The `BackendConfig`
+has been overloaded to store NAT discovery and other gateway config in addition to cable driver config. The settings are extracted from
+labels/annotations on the GW mode.
 
-If more than one matching policy is found, the default policy will consulted to establish if `NoConnectOnConflict` is set to true.
-In the case where `NoConnectOnConflict` is true the clusters are **not connected** and the connection status between a pair of clusters
-is marked as `conflict`. In the case where `NoConnectOnConflict` is false, the clusters are connected but the connection status between
-a pair of clusters is marked as `conflict`. If `NoConnectOnConflict` is undefined, it's assumed to be set to True.
-
-The initial `ClusterConnectionPolicy` resources would be created and maintained on the broker cluster and synced to each cluster in the
-ClusterSet.
-
-Submariners `EndpointSpec` needs to be modified as `Backend` and `BackendConfig` only reflect a single cable driver. An alternative parameter
-`Backends` is proposed. This parameter represents a slice of supported backends and their configurations on an Endpoint. This information
+Ideally an alternative parameter `Backends` can be used in the `EndpointSpec` to reflect the cable drivers and their associated
+configurations. This parameter represents a slice of supported backends and their configurations on an Endpoint. This information
 can be used in conjunction with the `ClusterConnectionPolicy` to validate a connection can be established (i.e. both ends of the connection
 support the same driver).
 
-The `EndpointSpec` could also be modified to advertise which policies it supports to further support the search for a suitable policy for
-a remote gateway trying to connect to that endpoint. The `SupportedPolicies` parameter is a simple slice of strings that identifies the set
-of policies that a Gateway has deemed as being applicable to it from the set of `ClusterConnectionPolicy` CRs.
+> **_Note:_** Some components in Submariner have been built on the assumption that there is only a single cable driver. These components
+> need to be identified and refactored. On example is referenced [here](https://github.com/submariner-io/submariner/blob/devel/pkg/routeagent_driver/handlers/kubeproxy/routes_iface.go#L115)
 
 ```go
 type EndpointSpec struct {
-  // +kubebuilder:validation:MaxLength=63
-  // +kubebuilder:validation:MinLength=1
   ClusterID string `json:"cluster_id"`
   CableName string `json:"cable_name"`
   // +optional
@@ -99,7 +91,6 @@ type EndpointSpec struct {
   PublicIP           string            `json:"public_ip"`
   NATEnabled         bool              `json:"nat_enabled"`
   Backends           []BackendSpec     `json:"backends,omitempty"`
-  SupportedPolicies  []string          `json:"supported_policies,omitempty"`
 }
 
 type BackendSpec struct {
@@ -144,15 +135,15 @@ The Connection information stored on a Gateway should be updated to reflect what
 
 ```go
 type Connection struct {
-  Status        ConnectionStatus  `json:"status"`
-  StatusMessage string            `json:"statusMessage"`
-  Endpoint      EndpointSpec      `json:"endpoint"`
-  UsingIP       string            `json:"usingIP,omitempty"`
-  UsingNAT      bool              `json:"usingNAT,omitempty"`
-  PolicyID      string            `json:"policy_id,omitempty"`
-  cableType     string            `json:"cable_type,omitempty"`
+  Status             ConnectionStatus  `json:"status"`
+  StatusMessage      string            `json:"statusMessage"`
+  Endpoint           EndpointSpec      `json:"endpoint"`
+  UsingIP            string            `json:"usingIP,omitempty"`
+  UsingNAT           bool              `json:"usingNAT,omitempty"`
+  usingPolicy        string            `json:"usingPolicy,omitempty"`
+  usingCableDriver   string            `json:"usingCableDriver,omitempty"`
   // +optional
-  LatencyRTT *LatencyRTTSpec     `json:"latencyRTT,omitempty"`
+  LatencyRTT         *LatencyRTTSpec   `json:"latencyRTT,omitempty"`
 }
 ```
 
@@ -160,13 +151,11 @@ type Connection struct {
 
 The detailed connection information for a Gateway is currently maintained in the Gateway and Submariner CRs,
 however when the number of clusters grows to a large scale these could be difficult to parse. It maybe preferable
-to maintain connection information in a separate set of `ClusterConnection` CRs. This could be useful in the case of:
+to maintain connection information in a separate set of `ClusterConnection` CRs. This could be useful in the case
+of Gateway failover, so the new gateway doesn't need to do the same work again to build a connection definition. Or
 
-- Gateway failover, so the new gateway doesn't need to do the same work again to build a connection definition. Or
-- In the case of `ClusterConnectionPolicy` updates. A Gateway could quickly cycle through the connection policies its
-using in the `ClusterConnection` CRs to see if an update impacts it.
-
-> **_NOTE:_** The scope of a `ClusterConnectionPolicy` CR is across the ClusterSet. The scope of a `ClusterConnection` is local to a cluster.
+> **_NOTE:_** The scope of a `ClusterConnectionPolicy` CR is across the ClusterSet. The scope of a `ClusterConnection`
+> is local to a cluster.
 
 The proposed Connection CRD is shown below.
 
@@ -306,9 +295,9 @@ Spec:
     cable_driver:
         name: ipsec
         config:
-          Natt - Discovery - Port:  4490
+          Natt - Discovery - Port:  4491
           Preferred - Server:       false
-          Udp - Port:               4789
+          Udp - Port:               4500
   cable_name:                 submariner-cable-cluster1-172-18-0-14
   cluster_id:                 cluster1
   Health Check IP:            10.1.192.0

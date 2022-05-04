@@ -1,5 +1,9 @@
 # IPSec Certificate Issuer
 
+## Status
+
+Deferred
+
 ## Summary
 
 Submariner's current security arrangements, namely using an identical pre-shared key in

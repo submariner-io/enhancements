@@ -1,5 +1,9 @@
 # Multiple Active Gateways
 
+## Status
+
+Deferred
+
 ## Summary
 
 Submariner currently only allows a single gateway to be active at any one time in a given cluster.
@@ -100,7 +104,7 @@ the inter-cluster VxLAN Tunnel via a multipath route on the gateway node:
    a. DstIP of the packet is the Cluster IP of the exported k8s service, so the traffic is DNAT’ed by the CNI to a backend Pod IP:
 
     ```shell
-    -A KUBE-SEP-WWP6UFXXL5K3PY6D -p tcp -m comment --comment "default/submariner-lpq6zr4tl4o5qvrv2t7o3l3gawkagast" 
+    -A KUBE-SEP-WWP6UFXXL5K3PY6D -p tcp -m comment --comment "default/submariner-lpq6zr4tl4o5qvrv2t7o3l3gawkagast"
     -m tcp -j DNAT --to-destination 10.0.128.5:80
     ```
 
@@ -218,7 +222,7 @@ route on the gateway node:
 CNI to a backend Pod IP:
 
     ```shell
-    -A KUBE-SEP-WWP6UFXXL5K3PY6D -p tcp -m comment --comment "default/submariner-lpq6zr4tl4o5qvrv2t7o3l3gawkagast" 
+    -A KUBE-SEP-WWP6UFXXL5K3PY6D -p tcp -m comment --comment "default/submariner-lpq6zr4tl4o5qvrv2t7o3l3gawkagast"
     -m tcp -j DNAT --to-destination 10.0.128.5:80
     ```
 
@@ -305,8 +309,10 @@ No data-model changes specific to the non-Globalnet deployment.
 
 ### Globalnet
 
-#### Globalnet ClusterGlobalEgressIps Instancing
+#### Globalnet ClusterGlobalEgressIps, GlobalEgressIps and GlobalIngressIps Instancing
 
+**NOTE:** In the PoC, only the `clusterglobalegressips` CRD Object was updated as described below. However,  `globalegressips`
+and `globalingressips` CRD Objects will need similar changes.
 Currently, there is one instance of the `clusterglobalegressips` CRD object per cluster. This object is a set of
 globally unique IP Addresses (across all clusters managed by Submariner) one of which is used on the Gateway node
 as the IP Address to SNAT the source address on egress packets. Currently, the one instance of the
@@ -388,8 +394,10 @@ objects and modify the IP Tables as needed on their host. An alternative to this
 datapath functionality needed for globalnet to the RouteAgent, however this would result in a much higher level of
 complexity for the RA, and a bigger re-write.
 
-#### Expose ClusterGlobalEgressIPs to Remote Clusters
+#### Expose ClusterGlobalEgressIPs, GlobalEgressIPs and GlobalIngressIPs to Remote Clusters
 
+**NOTE:** In the PoC, only the `clusterglobalegressips` CRD Object was considered as described below. However,
+`globalegressips` and `globalingressips` CRD Objects will need similar changes.
 Referencing the [Multiple Active Gateway Packet Flow with Globalnet](#multiple-active-gateway-packet-flow-with-globalnet)
 drawing, new routes need to be added to remote
 cluster gateways (GW-4 in the drawing) that include the `ClusterGlobalEgressIPs` IP Addresses from each sending
@@ -423,9 +431,12 @@ for sharing the desired data.
 
 Currently, there is one instance of the Submariner ClusterGlobalEgressIP CRD Object in a given cluster and is
 not shared across clusters. For the Multiple Active Gateway feature, there will need to be an instance of this
-CRD object per gateway (see [Globalnet ClusterGlobalEgressIps Instancing](#globalnet-clusterglobalegressips-instancing)).
+CRD object per gateway
+(see [Globalnet ClusterGlobalEgressIps, GlobalEgressIps and GlobalIngressIps
+Instancing](#globalnet-clusterglobalegressips-globalegressips-and-globalingressips-instancing)).
 To share this CRD Object across clusters, the instance naming will need the cluster name prepended to the name (in addition
-to the node name described in [Globalnet ClusterGlobalEgressIps Instancing](#globalnet-clusterglobalegressips-instancing)).
+to the node name described in [Globalnet ClusterGlobalEgressIps, GlobalEgressIps and GlobalIngressIps
+Instancing](#globalnet-clusterglobalegressips-globalegressips-and-globalingressips-instancing)).
 The `ClusterID` also needs to be included in the CRD Object. *(TBD - Node name as well?)*
 
 ```go
@@ -485,7 +496,7 @@ Gateway vxlan interface:
 ```shell
 vx-submariner: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN mode DEFAULT group default
    link/ether c2:d7:85:b1:42:94 brd ff:ff:ff:ff:ff:ff promiscuity 0 minmtu 68 maxmtu 65535
-   vxlan id 100 srcport 0 0 dstport 4800 nolearning ttl auto ageing 300 udpcsum noudp6zerocsumtx noudp6zerocsumrx 
+   vxlan id 100 srcport 0 0 dstport 4800 nolearning ttl auto ageing 300 udpcsum noudp6zerocsumtx noudp6zerocsumrx
    addrgenmode eui64 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535
 ```
 
@@ -494,7 +505,7 @@ Non-Gateway vxlan interface:
 ```shell
 vx-submariner: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN mode DEFAULT group default
    link/ether 2a:d6:76:1d:e0:76 brd ff:ff:ff:ff:ff:ff promiscuity 0 minmtu 68 maxmtu 65535
-   vxlan id 100 remote <LOCAL GW NODE IP> srcport 0 0 dstport 4800 nolearning ttl auto ageing 300 udpcsum noudp6zerocsumtx 
+   vxlan id 100 remote <LOCAL GW NODE IP> srcport 0 0 dstport 4800 nolearning ttl auto ageing 300 udpcsum noudp6zerocsumtx
    noudp6zerocsumrx addrgenmode eui64 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535
 ```
 
@@ -649,6 +660,79 @@ Routing Table 100:
 * The multipath routes require an interface, so this approach won't work with IPsec Tunnel Mode.  IPsec Transport mode,
   proposed in [IPSec transport mode support](https://github.com/submariner-io/enhancements/pull/103) will be required for
   IPsec encryption.
+* During the review of the Enhancement Proposal, there was concern raised regarding the SNAT that occurs in Step 3-b (See
+   [Multiple Active Gateway Packet Flow without Globalnet](#multiple-active-gateway-packet-flow-without-globalnet) and
+   [Multiple Active Gateway Packet Flow with Globalnet](#multiple-active-gateway-packet-flow-with-globalnet)).
+   The concern is that up to this point, Submariner has preserved the source IP all the way to the destination pod.
+   This may be needed in the future for policy enforcement. The SNAT is in place so the packet returns to the Gateway
+   the packet came from within this cluster so that connection tracking can reverse the DNAT that occurred when the
+   Service IP was resolved to a Pod IP. At this time, we do not have a work around.
+
+## PoC
+
+To prove out the architecture described in this document, a PoC was implemented and can be found in:
+
+<!-- markdownlint-disable line-length -->
+* [github.com/submariner-io/submariner/tree/feature-multi-active-gw](https://github.com/submariner-io/submariner/tree/feature-multi-active-gw)
+* [github.com/submariner-io/submariner-operator/tree/feature-multi-active-gw](https://github.com/submariner-io/submariner-operator/tree/feature-multi-active-gw)
+<!-- markdownlint-enable line-length -->
+
+Additional details regarding the PoC can be found in the
+[README.md](https://github.com/submariner-io/submariner/blob/feature-multi-active-gw/README.md)
+on the feature branch.
+
+The PoC implements Multiple Active Gateways with both Globalnet and non-Globalnet deployments.
+Use the following commands to deploy in a set of KIND clusters. The globalnet flags are optional.
+Because there are now additional Gateways, additional nodes need the `submariner.io/gateway=true` label.
+
+Using `make deploy`:
+
+```shell
+make deploy using=lighthouse,vxlan,globalnet DEPLOY_ARGS='--deploytool_submariner_args="--multi-active-gateway=true"'
+
+kubectl config use-context cluster1
+kubectl label nodes cluster1-worker2 submariner.io/gateway=true
+
+kubectl config use-context cluster2
+kubectl label nodes cluster1-worker2 submariner.io/gateway=true
+```
+
+Manually deploying:
+
+<!-- markdownlint-disable line-length -->
+```shell
+make clusters
+
+kubectl config use-context cluster1
+kubectl label nodes cluster1-worker submariner.io/gateway=true
+kubectl label nodes cluster1-worker2 submariner.io/gateway=true
+
+subctl deploy-broker --kubeconfig output/kubeconfigs/kind-config-cluster1 --repository localhost:5000 --version local --globalnet
+
+subctl join --kubeconfig output/kubeconfigs/kind-config-cluster1 broker-info.subm --clusterid cluster1 --natt=false --repository localhost:5000 --version local --cable-driver vxlan --multi-active-gateway=true
+
+kubectl config use-context cluster2
+kubectl label nodes cluster1-worker submariner.io/gateway=true
+kubectl label nodes cluster1-worker2 submariner.io/gateway=true
+
+subctl join --kubeconfig output/kubeconfigs/kind-config-cluster2 broker-info.subm --clusterid cluster2 --natt=false --repository localhost:5000 --version local --cable-driver vxlan --multi-active-gateway=true
+ ```
+<!-- markdownlint-enable line-length -->
+
+This is a PoC and there were some shortcuts taken and there are some limitations.
+
+* All nodes must be in Multiple Active Gateway mode.
+  This won’t be required in the final implementation.
+* Headless services are broken.
+  Every Globalnet Controller was not rewritten until the architecture was agreed upon.
+* Only the VxLAN Cabledriver is supported.
+* Some of the `subctl` commands like `subctl diagnose` were not modified to take into account MAG.
+  Unit Tests were not written for the new feature, some existing tests were modified to fix compilation
+  issues or to get existing tests to pass.
+* The new `multi-active-gateway` flag was added to both implementations of `subctl` (old and new).
+  In the time since the PoC was completed, `subctl` has been moved to its own repo.
+  So this PoC code will need to be ported to the new repo.
+  **Use caution when rebasing to the feature-multi-active-gw branch to devel.**
 
 ## TODO
 
@@ -656,6 +740,8 @@ Routing Table 100:
 * Support non-kubeproxy route agent handlers.
 * Support Loadbalancer mode.
 * Support detection and handling of gateway failure and recovery.
+* In the PoC, only the new ClusterGlobalEgressIP Controller was implemented in the Gateway Pod
+  (See [Multiple Active Gateway Changes](#multiple-active-gateway-changes)). The other controllers need to be ported from Globalnet.
 
 ## Links
 

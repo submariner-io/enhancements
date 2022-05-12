@@ -1,5 +1,9 @@
 # Aggregate Service Import for Lighthouse
 
+## Status
+
+Deferred
+
 ## Summary
 
 The current Lighthouse implementation deviates from the MCS specification in the following ways:

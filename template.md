@@ -36,9 +36,3 @@ if needed -->
 ## User Impact
 
 <!-- Optional. Any impact on users this change may have. -->
-
-## Owners
-
-<!-- Optional. List of owners for this enhancement proposal and its implementation -->
-* Owner 1 Name <owner1@email.com>
-* Owner 2 Name <owner2@email.com>

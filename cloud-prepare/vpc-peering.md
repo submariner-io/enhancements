@@ -1,26 +1,31 @@
-# Submariner VPC Peering Support
+# Submariner Peering Support
 
 This document describes the technical details and impact of our proposal design
-to include Virtual Private Cloud (VPC) Peering support for Submariner and
+to include Virtual Private Cloud Peering support for Submariner and
 `subctl` located at this [Pull Request](https://github.com/submariner-io/cloud-prepare/pull/190).
 
 ## Abstract
+
 This idea was born meanwhile the CockroachDB project focused to deploy a
 multi-cluster setup of CockroachDB and communicate the different clusters across
 regions using Submariner.
 
 One of the requirements generated from that project was to deploy CockroachDB on
-AWS in different regions at the same time, using VPC Peering and configure VXLan
-(instead of IPsec) to increase network performance because VPC Peering
+AWS in different regions at the same time, using Peering and configure VXLan
+(instead of IPsec) to increase network performance because Peering
 connections are already secure and encrypted.
 
 In order to achieve that, we observed neither the Operator nor the `subctl` CLI
-supported VPC Peering setup, configuration or deployment. For that reason, we
+supported Peering setup, configuration or deployment. For that reason, we
 decided to provide such functionality to cloud-prepare and subctl.  With a set
 of sub-commands in subctl, developers will automatically provision and configure
-a VPC Peering between two clusters of the same cloud provider. Once
-cloud-prepare allows VPC Peering, the Submariner Operator will include the VPC
+a Peering between two clusters of the same cloud provider. Once
+cloud-prepare allows Peering, the Submariner Operator will include the VPC
 Peering configuration as well.
+
+With cloud Peering only the nodes of the connected Kubernetes clusters will be
+reachable. It is still needed a component like Submariner for the pods/service of
+two Kubernetes clusters to be reachable.
 
 ## Design
 
@@ -29,50 +34,49 @@ how it works.
 
 ### New `subctl` sub-commands
 
-We purpose to add some subcommands to `subctl` to use the new VPC Peering
+We purpose to add some subcommands to `subctl` to use the new Peering
 features described on this document.
 
-#### VPC Peering Subcommands
+#### Peering Subcommands
 
 This will be how new added sub-commands would be like.
 
 ```bash
-$ ./bin/subctl cloud VPC Peering
-This command creates a VPC Peering between different clusters of the same cloud
+$ ./bin/subctl cloud peering
+This command creates a Peering between different clusters of the same cloud
 provider.
 
 Usage:
-  subctl cloud VPC Peering [command]
+  subctl cloud peering [command]
 
 Available Commands:
-  clean       Remove a VPC Peering between clusters
-  create      Create a VPC Peering between clusters
+  clean       Remove a Peering between clusters
+  create      Create a Peering between clusters
 
 Flags:
-  -h, --help   help for VPC Peering
+  -h, --help   help for Peering
 
 Global Flags:
       --kubeconfig string    absolute path(s) to the kubeconfig file(s)
       --kubecontext string   kubeconfig context to use
 
-Use "subctl cloud VPC Peering [command] --help" for more information about a
+Use "subctl cloud peering [command] --help" for more information about a
 command.
 ```
 
-#### VPC Peering create/clean subcommand
+#### Peering create/clean subcommand
 
 ```bash
-$ ./bin/subctl cloud VPC Peering create
-This command creates a VPC Peering between different clusters of the same cloud
+$ ./bin/subctl cloud peering create
+This command creates a Peering between different clusters of the same cloud
 provider.
 
 Usage:
-  subctl cloud VPC Peering create [command]
+  subctl cloud peering create [command]
 
 Available Commands:
-  aws         Create a VPC Peering on AWS cloud
-  gcp         Create a VPC Peering on GCP cloud
-  generic     Create a VPC peering between generic clusters for Submariner
+  aws         Create a Peering on AWS cloud
+  gcp         Create a Peering on GCP cloud
 
 Flags:
   -h, --help   help for create
@@ -81,20 +85,23 @@ Global Flags:
       --kubeconfig string    absolute path(s) to the kubeconfig file(s)
       --kubecontext string   kubeconfig context to use
 
-Use "subctl cloud VPC Peering create [command] --help" for more information
+Use "subctl cloud peering create [command] --help" for more information
 about a command.
 ```
 
-#### VPC Peering cloud-provider option (Available for create & clean subcomands)
+#### Peering cloud-provider option (Available for create & clean subcomands)
+
+The `create` command will add specific annotations to the created objects so that
+the `clean` command only removes these elements added during the `create` phase.
 
 ```bash
 $ ./bin/subctl cloud
-VPC Peering create aws --help
+Peering create aws --help
 This command prepares an OpenShift installer-provisioned infrastructure (IPI) on
 AWS cloud for Submariner installation.
 
 Usage:
-  subctl cloud VPC Peering create aws [flags]
+  subctl cloud peering create aws [flags]
 
 Flags:
       --credentials string           AWS credentials configuration file (default
@@ -125,15 +132,15 @@ Global Flags:
 ### How it works
 
 This feature is designed to allow Submariner when the
-architecture requires a VPC Peering between two clusters on the same
-cloud-provider. VPC Peering between hosts networks allows to deploy submariner
+architecture requires a Peering between two clusters on the same
+cloud-provider. Peering between hosts networks allows to deploy submariner
 using VXLAN speeding up the throughput thanks to not require IPSec encryption
 layer between submariner's gateways.
 
 The new feature includes new subctl set of commands to allow setting up a new
-VPC Peering in a similar way as subctl cloud-prepare configures the
+Peering in a similar way as subctl cloud-prepare configures the
 inbound/outbound network ports and rules to deploy Submariner.  Those commands
-are detailed in [VPC Peering subcomand](#vpc-peering-subcomands) section.
+are detailed in [Peering subcomand](#peering-subcomands) section.
 
 To be able to use this feature, it's mandatory to have the `metadata.json` file
 result of installation process of both clusters or specify the required properties
@@ -146,7 +153,7 @@ process, whereas the "target cluster" is the cluster accepting the peering.
 
 ### Cloud providing support
 
-As each cloud providers has different implementations of VPC Peering concept,
+As each cloud providers has different implementations of Peering concept,
 it's needed to develop specific implementations to each provider. The target
 cloud providers are:
 
@@ -164,13 +171,13 @@ for each of the target cloud providers in a generic way, including the missing
 adaptor methods for the cloud clients.
 
 * AWS
-  * aws.AcceptVpcPeeringConnection
+  * aws.AcceptPeeringConnection
   * aws.CreateRoute
-  * aws.CreateVpcPeeringConnection
+  * aws.CreatePeeringConnection
   * aws.DescribeRouteTables
-  * aws.DescribeVpcPeeringConnections
+  * aws.DescribePeeringConnections
   * aws.DeleteRoute
-  * aws.DeleteVpcPeeringConnection
+  * aws.DeletePeeringConnection
 
 * GCP
   * gcp.AddPeering

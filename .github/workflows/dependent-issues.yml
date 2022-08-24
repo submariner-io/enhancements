@@ -11,6 +11,11 @@ on:
       - opened
       - edited
 
+permissions:
+  issues: write
+  pull-requests: write
+  statuses: write
+
 jobs:
   check:
     name: Check Dependencies

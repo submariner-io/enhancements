@@ -135,7 +135,7 @@ to ensure that the gateway lands on the right platform. Then rely on Libreswan t
 
 * Since one of the advantages of transport mode is performance, it is worth mentioning that better performance is achieved mainly
 by HW offload and HW offload is only relevant when SM runs on a node connected to a physical NIC (eg: k8s node == baremetal server).
-* The proposal allows flexibility by letting SM control the overlay over IPSec in transport mode, so we have [IP][ESP][Overlay].
+* The proposal allows flexibility by letting SM control the overlay over IPSec in transport mode, so we have IP/ESP/Overlay.
 
 These are all cool, but I think we need to understand:
 

@@ -15,15 +15,32 @@ With OVN Interconnect we can have two types of deployment
 ### Single Zone(Global Zone)
 
 A single-zone deployment will have only one OVN database and a set of master nodes programming it. This is similar to the topology that we
-use now. But it will have a Zone(global) assigned to it and will have a transit switch created for it. Though the transit switch is not
-involved in any packet forwarding in this topology. Though this setup is expected to work by default, the subnet that the transit switch
+use now. But it will have a single `global` zone assigned to it with a transit switch which is not involved in any packet forwarding. Though
+this setup is expected to work by default, the subnet that the transit switch
 used overlaps with the subnet Submariner uses for the logical router. So we need to agree upon a non-overlapping subnet for Submariner.
+In this proposal, I changed the Submariner router IP ranges to 244.254.254.0/8 for illustrative purposes.
+
+```bash
+    k8s.ovn.org/ovn-node-id: "5"
+    k8s.ovn.org/ovn-node-transit-switch-port-ips: '["169.254.0.1/16"]'
+    k8s.ovn.org/ovn-zone: global
+```
 
 ### Multiple Zone
 
-In a multiple-zone setup, we will have an OVN database and a set of master nodes for each zone. Transit switches connect between these
-nodes. The OVN-Kubernetes services ensure that the necessary routes are added for pod and service reachability across nodes in different
-zones.
+In a multiple-zone setup, we will have an OVN database and a set of master nodes for each zone. Transit switches connect the zones.
+The OVN-Kubernetes services ensure that the necessary routes are added for pod and service reachability across nodes in different zones.
+
+```bash
+    k8s.ovn.org/ovn-node-id: "3"
+    k8s.ovn.org/ovn-node-transit-switch-port-ips: '["169.254.0.3/16"]'
+    k8s.ovn.org/ovn-zone: global
+
+    k8s.ovn.org/ovn-node-id: "5"
+    k8s.ovn.org/ovn-node-transit-switch-port-ips: '["169.254.0.5/16"]'
+    k8s.ovn.org/ovn-zone: az2
+    
+```
 
 With the current architecture, Submariner adds routes only in the zone in which it is deployed. For example, if Submariner is deployed in
 zone 1 it programs OVN db in zone 1. So only pods in zone 1 nodes will be able to talk to other clusters. Pods in zone 2 or zone 3 will not
@@ -41,10 +58,11 @@ router.
 
 These are the changes that will be needed
 
-1) Network plugin Syncer needs to be Zone aware
-2) In the Zone where Submariner Gateway is present an extra route will be added to direct the traffic to remote CIDRS connected via
-submariner to the Submariner router. This is for the remote traffic coming from other zones.
-3) In all the other zones a route will be added to direct the traffic to remote cluster CIDRS, connected via submariner, to the transit
+1) Network plugin Syncer needs to be `zone` aware
+2) In the `zone` where Submariner Gateway is present an extra route will be added to the `ovn-cluster-router` to direct the traffic to remote
+CIDRs connected via submariner via the Submariner router. This is to facilitate inter-cluster connectivity for traffic generated from other
+zones of the cluster.
+3) In all the other zones a route will be added to direct the traffic to remote cluster CIDRs, connected via submariner, to the transit
 switch that connects to the gateway node
 
 #### Node Listener
@@ -69,11 +87,34 @@ will remain as it is today.
 
 * If a zone configuration is detected
 
-1) In the gateway node zone a new routing rule can be added to forward the traffic destined for Submariner remote CIDRS
-to the Submariner router. This is required for the traffic coming from pods in a node that is in a different zone.
+1) In the gateway node zone a new routing rule can be added to forward the traffic destined for Submariner remote CIDRs
+to the Submariner router. This is required for the traffic coming from pods in a node that are in a different zone.
+
+```bash
+_uuid               : 0459f009-3603-47ac-8ee7-9d958540ed31
+bfd                 : []
+external_ids        : {}
+ip_prefix           : "242.1.0.0/16"
+nexthop             : "244.254.254.1"
+options             : {}
+output_port         : []
+policy              : []
+route_table         : ""
+```
 
 2) In the non-gateway zones a route will be added for the traffic destined for remote cluster CIDR to forward it to the gateway node
 transit switch.
+
+```bash
+_uuid               : 22db3005-64c5-4e32-aeb0-642423c30742
+action              : reroute
+external_ids        : {}
+match               : "ip4.dst==242.1.0.0/16"
+nexthop             : []
+nexthops            : ["169.254.0.1"]
+options             : {"external_ids:{submariner"="true}"}
+priority            : 20000
+```
 
 #### Pros of Option1
 
@@ -122,7 +163,13 @@ to advertise Submariner routes. But this feature seems to be not available in th
 
 ## External Dependencies
 
-<!-- Any external dependencies this proposal may have -->
+These OVN changes should be merged for OVN Interconnect support in the CNI
+
+[Add cluster manager support](https://github.com/ovn-org/ovn-kubernetes/pull/3127)
+
+[Add zone support](https://github.com/ovn-org/ovn-kubernetes/pull/3169)
+
+[Multiple zone support](https://github.com/ovn-org/ovn-kubernetes/pull/3366)
 
 ## User Impact
 

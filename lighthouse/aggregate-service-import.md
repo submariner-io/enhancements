@@ -54,11 +54,13 @@ subsequent exporting clusters to reuse it, handling conflicts appropriately.
 
 #### Service Ports
 
-The MCS specification states that the derived service will expose the union of the service ports declared on its constituent
-services. However this would seem problematic if a connection request for a service port is directed to a cluster that
-does not serve that port. To prevent this scenario, Lighthouse will expose the intersection of all the constituent
-service ports in the aggregated `ServiceImport`. If there are any non-matching service ports, each constituent cluster's
-`ServiceExport` will have a `ServiceExportConflict` condition set in its status.
+The MCS specification states that a derived `ClusterIP` service will expose the union of the service ports declared on its
+constituent services. However this would seem problematic if a connection request for a service port is directed to a
+cluster that  does not serve that port. To prevent this scenario, Lighthouse's CoreDNS backend will expose the
+intersection of all the constituent service ports for SRV queries that don't target a specific cluster. However, to
+maintain compliance with the MCS specification, the aggregated `ServiceImport` will contain the union of the service
+ports. If there are any non-matching service ports, each constituent cluster's `ServiceExport` will have a
+`ServiceExportConflict` condition set in its status.
 
 #### Service Type
 
@@ -71,11 +73,11 @@ will still be set to true because the service itself, by definition, is still ex
 ### DNS Resolution
 
 Lighthouse currently implements DNS resolution by round-robin load balancing between the
-`ServiceImports` that match the namespace/name pair. With a merged `ServiceImport`, the
-per-cluster service VIPs and port will be stored on the `EndpointSlices`. DNS resolution will select from
+`ServiceImports` that match the namespace/name pair. With an aggregated `ServiceImport`, the
+per-cluster service VIPs and ports will be stored on the `EndpointSlices`. DNS resolution will select from
 the `EndpointSlices` associated with the aggregated `ServiceImport`. If no specific cluster is requested, the
-service ports from the aggregated `ServiceImport` will be returned, otherwise the requested cluster's service ports
-from its `EndpointSlice` will be returned.
+intersection of the service ports from the constituent clusters will be returned, otherwise the requested cluster's
+service ports from its `EndpointSlice` will be returned.
 
 DNS Resolution behaviour for headless services will remain unchanged.
 
@@ -93,40 +95,39 @@ than is possible with the DNS resolver.
 
 Here are the detailed steps for adding a `ServiceExport` to a cluster:
 
-1. When a new `ServiceExport` is created, a local `ServiceImport` is created in the submariner namespace containing the
-   local `Service` information.
-2. The local `ServiceImport` is checked for conflicts with the aggregated `ServiceImport` located on the broker cluster
-   in the broker namespace.
-3. If in conflict, a `ServiceExportConflict` condition is set in the `ServiceExport` status and conflict resolution is
+1. When a new `ServiceExport` is created, the local `Service` information is checked for conflicts with the aggregated
+   `ServiceImport` located on the broker cluster in the broker namespace, if present.
+2. If in conflict, a `ServiceExportConflict` condition is set in the `ServiceExport` status and conflict resolution is
    attempted.
-4. If a conflict cannot be resolved, the cluster's service information is not exported.
-5. Otherwise or if no conflicts, Lighthouse updates `ServiceImport.Status.Clusters` to include the cluster
-   name and merges the port information appropriately.
-6. The aggregated `ServiceImport` is synced from the broker to the namespace of the local service.
-7. A new `EndpointSlice` is created containing the service VIP (or Pod VIPs for headless) and synced to
-   the broker.
+3. If a conflict cannot be resolved, the cluster's service information is not exported.
+4. Otherwise or if no conflicts, Lighthouse updates `ServiceImport.Status.Clusters` to include the cluster name.
+5. A new `EndpointSlice` is created containing the service VIP (or Pod VIPs for headless) and synced to the broker.
+6. The port information from the `EndpointSlice` is merged with the port information from the other constituent
+   `EndpointSlice`s and updated on the aggregated `ServiceImport`. If in conflict, a `ServiceExportConflict` condition
+   is set in the `ServiceExport` status.
+7. The aggregated `ServiceImport` is synced from the broker to the namespace of the local service.
 
 ### Removing a ServiceExport
 
 Here are the steps for removing a `ServiceExport` from a cluster:
 
-1. When a `ServiceExport` is removed, the associated local `ServiceImport` and `EndpointSlice` are deleted.
-2. The aggregated `ServiceImport` is updated to remove the cluster name and re-calculate the service ports based on the
-   remaining clusters.
-3. If the aggregated `ServiceImport` status has an empty cluster list, it is removed.
-4. Other clusters with `ServiceExports` in conflict should watch for `ServiceImport` updates and re-evaluate
-   any conflicts, possibly creating a new `ServiceImport` if the prior conflict prevented exporting.
+1. When a `ServiceExport` is removed, the aggregated `ServiceImport` is updated to remove the cluster name. If the
+   aggregated `ServiceImport` status has an empty cluster list, it is removed.
+2. The associated `EndpointSlice` is deleted.
+3. The service ports are re-calculate based on the remaining constituent clusters and updated on the aggregated
+   `ServiceImport`.
+4. The remaining constituent clusters should re-evaluate any prior conflicts and update the `ServiceExport`
+   accordingly.
 
 ### EndpointSlice Behaviour
 
-The endpoint list for `EndpointSlice` that gets created by an exporting cluster will contain one of:
+The endpoint list for an `EndpointSlice` that gets created by an exporting cluster will contain one of:
 
-- The service VIP (or Globalnet service VIP) for ClusterIP services
-- The list of pod IPs (or Globalnet pod IPs) for Headless services
+- The service VIP (or Globalnet service VIP) for `ClusterIP` services
+- The list of pod IPs (or Globalnet pod IPs) for `Headless` services
 
-When an exporting cluster has no pods backing an exported service, the endpoint list of the `EndpointSlice` for the
-cluster will be cleared. This is to ensure that requests do not get directed to clusters that
-have no pods to service the request.
+For a `ClusterIP` service, if there are no backing pods, the service VIP endpoint address will have the `Ready` condition
+set to false. This is to ensure that requests do not get directed to clusters that have no pods to service the request.
 
 ### Migration
 
@@ -134,14 +135,13 @@ Per-cluster `ServiceImports` wlll no longer be created but, for rolling cluster 
 of time where there will be a mix of upgraded and non-upgraded clusters. The latter still need to observe the per-cluster
 `ServiceImports` so they need to remain on the broker during the transition period.
 
-An upgraded cluster can remove its local copy of a remote cluster's `ServiceImport` when it observes the remote cluster's
-name in the status of the aggregated `ServiceImport`, which indicates the remote cluster was upgraded. Once the local
-copies of all remote cluster `ServiceImports` have been removed, the local cluster's `ServiceImport` can be removed from
-the broker.
+An upgraded cluster can remove its legacy per-cluster `ServiceImport` from the broker when it observes that all of the
+legacy `ServiceImport` cluster names are present in the aggregated `ServiceImport` status cluster name list. This
+indicates that all constituent clusters have been upgraded.
 
 The CoreDNS plugin still needs to watch for `ServiceImports` from non-upgraded clusters as well as the aggregated
-`ServiceImport` to maintain continuity during upgrade. If present, a cluster's `ServiceImport` will be used instead of
-its `EndpointSlice` when servicing requests to preserve prior behavior.
+`ServiceImport` to maintain continuity during upgrade. If present, a cluster's `ServiceImport` information will be used
+instead of its `EndpointSlice` for servicing requests to preserve prior behavior.
 
 ## Alternative Approaches
 

@@ -5,3 +5,6 @@ updates:
     directory: '/'
     schedule:
       interval: weekly
+    ignore:
+      # Newer versions have a bug that causes a false failure, see #153
+      - dependency-name: gaurav-nelson/github-action-markdown-link-check

@@ -30,7 +30,7 @@ With OVN Interconnect we can have two types of deployment
     name: cluster2-worker
 ```
 
-* Multiple Zone: In a multiple-zone setup, we will have an OVN database and a set of master nodes for each zone. Transit switches connect the
+* Multiple Zone: In a multiple-zone setup, we will have an OVN database and a master pod for each zone. Transit switches connect the
   zones. The OVN-Kubernetes services ensure that the necessary routes are added for pod and service reachability across nodes in different
   zones.
 
@@ -52,14 +52,15 @@ be able to reach remote clusters connected via Submariner.
 
 ### Route APIs
 
-As a part of this proposal, we are planning to add two new CRDs in Submariner
+As part of this proposal, we are planning to add two new CRDs in Submariner
 
 #### SubmarinerGwRoute
 
-This CR will be created when a remote endpoint is added and there will be one CR per remote cluster. This crd have two fields
+This CR will be created when a remote endpoint is added and there will be one CR per remote cluster. This crd has two fields
 
 * NextHop - Specifies the next hop to reach the remote cluster.
-* RemoteCIDR - Specifies the list of  remote CIDRS reachable via this cluster.
+* RemoteCIDR - Specifies the list of  remote CIDRs reachable via this cluster, in this case it will be the IP of ovn-k8s-mp0
+interface.
 
 This CR will be used by the gateway pod to program OVN to send the traffic destined to remote clusters to the Submariner tunnel.
 
@@ -111,12 +112,12 @@ type SubmarinerRoutePolicySpec struct {
 
 ## Design Details
 
-In this proposal, the plan is to remove the Submariner router and switches that it add to OVN db. The network-plugin-syncer shall be removed
-and can be replaced by controllers in Submariner Gateway and Submariner RouteAgent. Since we have multiple ovn db to program, we need multiple
-connections. So it makes it easier to program the OVN datapath from Submariner Gateway and RouteAgent, than using a separate pod.
-This new approach will work for both IC enabled and existing deployments. With this change we are planning to use the  ovn-k8s-mp0 interface
-to reach the host networking stack and then the Submariner tunnel. This interface is used by OVN for host-networking traffic with in a cluster
-and will be present in every node.
+In this proposal, the plan is to remove the current `submariner-router` and switches that were added to the OVN db. The network-plugin-syncer
+shall be removed  and can be replaced by controllers in Submariner Gateway and Submariner RouteAgent. Since we have multiple ovn db to
+program, we need multiple connections. So it makes it easier to program the OVN datapath from Submariner Gateway and RouteAgent, than using
+a separate pod. This new approach will work for both IC enabled and existing deployments. With this change we are planning to use the
+ovn-k8s-mp0 interface to reach the host networking stack and then the Submariner tunnel. This interface is used by OVN for host-networking
+traffic with in a cluster and will be present in every node.
 
 ![UpdatedTopology](./images/submariner-ovn-ic.png)
 
@@ -140,7 +141,7 @@ redirect any traffic destined to remote CIDR to the ovn-k8s-mp0 interface IP.
 _uuid               : 0459f009-3603-47ac-8ee7-9d958540ed31
 bfd                 : []
 external_ids        : {}
-ip_prefix           : "242.1.0.0/16"
+ip_prefix           : "10.132.0.0/16"
 nexthop             : "10.244.1.2"
 options             : {}
 output_port         : []
@@ -165,7 +166,7 @@ This controller will run in every in route agent. This controller connects to th
 _uuid               : 22db3005-64c5-4e32-aeb0-642423c30742
 action              : reroute
 external_ids        : {}
-match               : "ip4.dst==242.1.0.0/16"
+match               : "ip4.dst==10.132.0.0/16"
 nexthop             : []
 nexthops            : ["169.254.0.1"]
 options             : {"external_ids:{submariner"="true}"}
@@ -180,7 +181,7 @@ priority            : 20000
 _uuid               : d55185d8-3732-45c1-ae90-4a7f8cd191f7
 bfd                 : []
 external_ids        : {}
-ip_prefix           : "242.1.0.0/16"
+ip_prefix           : "10.132.0.0/16"
 nexthop             : "10.244.1.2"
 options             : {}
 output_port         : []
@@ -191,7 +192,8 @@ route_table         : ""
 ### Backward Compatibility
 
 With this architecture, we are removing the logical switches and routers that Submariner creates. During migration, we will need to delete
-these components and the routes that network-plugin-syncer installed. After that, the new controllers shall install the updated routes.
+these components and the routes that network-plugin-syncer installed. After that, the new controllers shall install the updated routes. The
+operator needs to be updated as well, not to create a network-plugin-syncer pods and remove any existing deployments.
 
 ### Alternatives
 
@@ -202,9 +204,10 @@ but by maintaining the submariner switches and router. While this should be easi
 
 #### Route Advertisement
 
-Another alternative was explored which could leverage the [route advertisement](
-https://docs.ovn.org/en/latest/tutorials/ovn-interconnection.html#route-advertisement) feature in OVN. The idea was to use this capability
-to advertise Submariner routes. But this feature seems to be not available in the OVN Kubernetes IC implementation.
+Another alternative was explored which could leverage the
+[route advertisement](https://docs.ovn.org/en/latest/tutorials/ovn-interconnection.html#route-advertisement)
+feature in OVN. The idea was to use this capability to advertise Submariner routes. But this feature seems to be not available in the
+OVN Kubernetes IC implementation.
 
 ## External Dependencies
 

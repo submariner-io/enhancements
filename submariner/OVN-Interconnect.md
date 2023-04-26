@@ -81,9 +81,9 @@ type SubmarinerRoutePolicySpec struct {
 }
 ```
 
-#### SubmarinerDefaultRoute
+#### SubmarinerNonGWRoute
 
-This CR will be created when a remote cluster is connected. When more remote clusters are added the Remote CIDR list will be updated.
+This CR will be created when a remote cluster is connected. When more remote endpoints are added the Remote CIDR list will be updated.
 
 * NextHop - Specifies the next hop.
 * RemoteCIDR - Specifies the list of remote CIDRs reachable via this gateway.
@@ -94,11 +94,11 @@ This CR will be used by the Routeagent pods to
 * In g/w node - add route to send the traffic from other zones, destined to remote cluster to the submariner tunnel
 
 ``` go
-type SubmarinerDefaultRouteList struct {
+type SubmarinerNonGWRouteList struct {
     metav1.TypeMeta `json:",inline"`
     metav1.ListMeta `json:"metadata"`
 
-    Items []SubmarinerDefaultRoute `json:"items"`
+    Items []SubmarinerNonGWRoute `json:"items"`
 }
 
 type SubmarinerRoutePolicySpec struct {
@@ -121,20 +121,22 @@ traffic with in a cluster and will be present in every node.
 
 ![UpdatedTopology](./images/submariner-ovn-ic.png)
 
-### SubmarinerGatewayPod
+### SubmarinerRouteAgentPod
 
-The Submariner g/w pod will be responsible for creating the SubmarinerGWRoute CR. It will be used only for OVN CNI right now. For every
+The Submariner Route-agent pod will be responsible for creating the SubmarinerGWRoute CR. It will be used only for OVN CNI right now. For every
 RemoteEndpointCreated event a SubmarinerGWRouteCR will be created. The nextHop will be the interface IP through which we can reach the cable
 driver. In the case of OVN it will be the IP of ovn-k8s-mp0 interface.
 
-The SubmarinerDefaultRoute CRD will also be created by Submariner Gateway. It will have the list of remote clusters connected to the gateway.
+The SubmarinerDefaultRoute CRD will also be created by Submariner Route-agent. It will have the list of remote clusters connected to the gateway.
 The nexthop will be the transit switch IP of the G/W node. If the transit switch IP is missing this CRD will not be created, which means it is
 a non-IC setup.
 
+The Routeagent will have these controllers added to it
+
 #### SubmarinerGWRouteCR Controller
 
-This controller will be responsible for programming the OVN cluster router, and it shall be a part of Submariner g/w pod. When a SubmarinerGWRoute
-CR is created  or modified the controller shall create or update a routing policy in OVN cluster router with a priority of 20000, and it should
+This controller will be responsible for programming the OVN cluster router, it will react only in a g/w node. When a SubmarinerGWRoute
+CR is created or modified the controller shall create or update a routing policy in OVN cluster router with a priority of 20000, and it should
 redirect any traffic destined to remote CIDR to the ovn-k8s-mp0 interface IP.
 
 ```bash
@@ -149,11 +151,7 @@ policy              : []
 route_table         : ""
 ```
 
-#### SubmarinerRouteAgentPod
-
-The Routeagent will have a new controller added to it
-
-##### SubmarinerDefaultRouteController
+##### SubmarinerNonGWRouteController
 
 This controller will run in every in route agent. This controller connects to the OVN DB. When a SubmarinerDefaultRoute CR is created
 
@@ -194,6 +192,14 @@ route_table         : ""
 With this architecture, we are removing the logical switches and routers that Submariner creates. During migration, we will need to delete
 these components and the routes that network-plugin-syncer installed. After that, the new controllers shall install the updated routes. The
 operator needs to be updated as well, not to create a network-plugin-syncer pods and remove any existing deployments.
+
+#### Open issues
+
+1. The update from older version of Submariner to a newer version will create  a datapath downtime.
+2. When multiple clusters are updated we need to check if one cluster can be done at a time.
+3. When Kubernetes cluster is update to a version that have IC enabled, there could be a datapath downtime till the
+Submariner g/w node is updated. Since the other nodes need the transit switch IP which will be available only when
+the g/w node is updated.
 
 ### Alternatives
 

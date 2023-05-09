@@ -4,9 +4,9 @@
 
 ## Summary
 
-OVN CNI is moving to a new network topology powered by OVN Interconnect Feature. This allows independent OVN deployments to be interconnected
-by OVN-managed GENEVE tunnels. Submariner does not work with these changes out of the box and this proposal explains the changes required to
-support it.
+OVN CNI is moving to a new network topology powered by OVN Interconnect Feature. This allows independent OVN deployments,
+within a kubernetes cluster, to be interconnected by OVN-managed GENEVE tunnels. Submariner does not work with these changes
+out of the box and this proposal explains the changes required to support it.
 
 ## Proposal
 
@@ -14,9 +14,11 @@ With OVN Interconnect we can have two types of deployment
 
 * Single Zone(Global Zone): A single-zone deployment will have only one OVN database and a set of master nodes programming it. This is similar
   to the topology that we use now. But it will have a single `global` zone assigned to it with a transit switch which is not involved in any
-  packet forwarding. Though this setup is expected to work by default, the subnet that the transit switch used overlaps with the subnet
-  Submariner uses for the logical router. In this proposal, we plan to remove the submariner router and the associated switches and this will
-  not be a problem anymore. The below indicates node annotations in a single zone  OVN setup.
+  packet forwarding. Though this setup is expected to work by default, the subnet that the transit switch uses overlaps with the subnet
+  Submariner uses for the logical router. In this proposal, we plan to remove the submariner logical router and the associated switches and
+  this will not be a problem anymore.
+
+  The below indicates node annotations in a single zone OVN setup and is added by OVN.
 
 ```bash
     annotations:
@@ -30,7 +32,7 @@ With OVN Interconnect we can have two types of deployment
     name: cluster2-worker
 ```
 
-* Multiple Zone: In a multiple-zone setup, we will have an OVN database and a master pod for each zone. Transit switches connect the
+* Multiple Zone: In a multiple-zone setup, we will have an OVN database and an OVN master pod for each zone. Transit switches connect the
   zones. The OVN-Kubernetes services ensure that the necessary routes are added for pod and service reachability across nodes in different
   zones.
 
@@ -48,29 +50,33 @@ With OVN Interconnect we can have two types of deployment
 
 With the current architecture, Submariner adds routes only in the zone in which it is deployed. For example, if Submariner is deployed in
 zone 1 it programs OVN db in zone 1. So only pods in zone 1 nodes will be able to talk to other clusters. Pods in zone 2 or zone 3 will not
-be able to reach remote clusters connected via Submariner.
+be able to reach remote clusters connected via Submariner. With these changes we plan to support both the modes and cluster where interconnect
+is not enabled as well.
 
 ### Route APIs
 
-As part of this proposal, we are planning to add two new CRDs in Submariner
+As part of this proposal, we are planning to add two new CRDs in Submariner. The plan is to decouple OVN dataplane programming so that this
+can be moved to OVN, when OVN provides a way to add custom routes. We can propose this CRD or consume the CRD that they provide at a later
+point of time.
 
 #### SubmarinerGwRoute
 
 This CR will be created when a remote endpoint is added and there will be one CR per remote cluster. This crd has two fields
 
-* NextHop - Specifies the next hop to reach the remote cluster.
-* RemoteCIDR - Specifies the list of  remote CIDRs reachable via this cluster, in this case it will be the IP of ovn-k8s-mp0
-interface.
+* NextHop - Specifies the next hop to reach the remote cluster, in this case it will be the IP of ovn-k8s-mp0
+  interface, the interface used by OVN for host networking.
+* RemoteCIDR - Specifies the list of  remote CIDRs reachable via this cluster.
 
-This CR will be used by the gateway pod to program OVN to send the traffic destined to remote clusters to the Submariner tunnel.
+This CR will be used by the route agent pod running on the non-Gateway nodes to program OVN to send the traffic destined to
+remote clusters via the Submariner tunnel.
 
 ``` go
-type SubmarinerGwRouteList struct {
-  metav1.TypeMeta `json:",inline"`
-  metav1.ListMeta `json:"metadata"`
+type SubmarinerGwRoute struct {
+    metav1.TypeMeta   `json:",inline"`
+    metav1.ObjectMeta `json:"metadata,omitempty"`
 
-  Items []SubmarinerGwRoute `json:"items"`
-  }
+    SubmarinerRoutePolicySpec SubmarinerRoutePolicySpec `json:"submarinerRoutePolicySpec"`
+}
 
 type SubmarinerRoutePolicySpec struct {
     //Specifies the next hop to reach the remote CIDRs
@@ -83,22 +89,22 @@ type SubmarinerRoutePolicySpec struct {
 
 #### SubmarinerNonGWRoute
 
-This CR will be created when a remote cluster is connected. When more remote endpoints are added the Remote CIDR list will be updated.
+This CR will be created when a remote endpoint is created. When more remote endpoints are added the Remote CIDR list will be updated.
 
 * NextHop - Specifies the next hop.
 * RemoteCIDR - Specifies the list of remote CIDRs reachable via this gateway.
 
-This CR will be used by the Routeagent pods to
+This CR will be used by the Routeagent pods running on the non-Gateway nodes to
 
-* In non-g/w node - send the traffic to the g/w node , if the current node is in a different zone
+* In non-g/w node - If the route-agent pod is not in the same zone as Gateway node zone, send the traffic to the g/w node zone.
 * In g/w node - add route to send the traffic from other zones, destined to remote cluster to the submariner tunnel
 
 ``` go
-type SubmarinerNonGWRouteList struct {
-    metav1.TypeMeta `json:",inline"`
-    metav1.ListMeta `json:"metadata"`
+type SubmarinerNonGWRoute struct {
+    metav1.TypeMeta   `json:",inline"`
+    metav1.ObjectMeta `json:"metadata,omitempty"`
 
-    Items []SubmarinerNonGWRoute `json:"items"`
+    SubmarinerRoutePolicySpec SubmarinerRoutePolicySpec `json:"submarinerRoutePolicySpec"`
 }
 
 type SubmarinerRoutePolicySpec struct {
@@ -113,8 +119,8 @@ type SubmarinerRoutePolicySpec struct {
 ## Design Details
 
 In this proposal, the plan is to remove the current `submariner-router` and switches that were added to the OVN db. The network-plugin-syncer
-shall be removed  and can be replaced by controllers in Submariner Gateway and Submariner RouteAgent. Since we have multiple ovn db to
-program, we need multiple connections. So it makes it easier to program the OVN datapath from Submariner Gateway and RouteAgent, than using
+shall be removed  and can be replaced by controllers in and Submariner RouteAgent. Since we have multiple ovn db to
+program, we need multiple connections. So it makes it easier to program the OVN datapath from RouteAgent, than using
 a separate pod. This new approach will work for both IC enabled and existing deployments. With this change we are planning to use the
 ovn-k8s-mp0 interface to reach the host networking stack and then the Submariner tunnel. This interface is used by OVN for host-networking
 traffic with in a cluster and will be present in every node.
@@ -127,7 +133,7 @@ The Submariner Route-agent pod will be responsible for creating the SubmarinerGW
 RemoteEndpointCreated event a SubmarinerGWRouteCR will be created. The nextHop will be the interface IP through which we can reach the cable
 driver. In the case of OVN it will be the IP of ovn-k8s-mp0 interface.
 
-The SubmarinerDefaultRoute CRD will also be created by Submariner Route-agent. It will have the list of remote clusters connected to the gateway.
+The SubmarinerDefaultRoute CRD will also be created by Submariner Route-agent. It will have the list of remote endpoints connected to the gateway.
 The nexthop will be the transit switch IP of the G/W node. If the transit switch IP is missing this CRD will not be created, which means it is
 a non-IC setup.
 
@@ -153,7 +159,7 @@ route_table         : ""
 
 ##### SubmarinerNonGWRouteController
 
-This controller will run in every in route agent. This controller connects to the OVN DB. When a SubmarinerDefaultRoute CR is created
+This controller will run in every route agent pod. This controller connects to the OVN DB. When a SubmarinerDefaultRoute CR is created
 
 * non-gateway node : it updates the DB with a router policy with a priority 20000 to send the traffic to the remote cluster via next hop
   mentioned, which is the transit switch IP to the g/w node. Before adding the route it checks if a route exists, if so it skips adding the
@@ -189,14 +195,16 @@ route_table         : ""
 
 ### Backward Compatibility
 
-With this architecture, we are removing the logical switches and routers that Submariner creates. During migration, we will need to delete
-these components and the routes that network-plugin-syncer installed. After that, the new controllers shall install the updated routes. The
-operator needs to be updated as well, not to create a network-plugin-syncer pods and remove any existing deployments.
+With this architecture, we are removing the logical switches and routers that Submariner created in the existing implementation.
+During migration, we will need to delete these components and the routes that network-plugin-syncer installed. After that,
+the new controllers shall install the updated routes. The operator needs to be updated as well, not to create a
+network-plugin-syncer pods and remove any existing deployments.
 
 #### Open issues
 
 1. The update from older version of Submariner to a newer version will create  a datapath downtime.
-2. When multiple clusters are updated we need to check if one cluster can be done at a time.
+2. When multiple clusters are updated we need to check if one cluster can be done at a time. The cluster will be down
+until all the nodes are updated.
 3. When Kubernetes cluster is update to a version that have IC enabled, there could be a datapath downtime till the
 Submariner g/w node is updated. Since the other nodes need the transit switch IP which will be available only when
 the g/w node is updated.

@@ -63,13 +63,13 @@ point of time.
 
 #### SubmarinerGwRoute
 
-This CR will be created when a remote endpoint is added and there will be one CR per remote cluster. This crd has two fields
+This CR will be created when a remote endpoint is added and there will be one CR per remote cluster. This CRD has two fields
 
 * NextHops - Specifies the list of next hop to reach the remote cluster, in this case it will be the IP of ovn-k8s-mp0
   interface, the interface used by OVN for host networking.
 * RemoteCIDR - Specifies the list of  remote CIDRs reachable via this cluster.
 
-This CR will be used by the route agent pod running on the non-Gateway node to program OVN to send the traffic destined to
+This CR will be used by the route agent pod running on the active-Gateway node to program OVN to send the traffic destined to
 remote clusters via the Submariner tunnel.
 
 ``` go
@@ -91,12 +91,10 @@ type SubmarinerRoutePolicySpec struct {
 
 #### SubmarinerNonGWRoute
 
-This CR will be created when a remote endpoint is created and there will be one created endpoint.
+This CR will be created when a remote endpoint is created and there will be one created per endpoint.
 
 * NextHops - Specifies the list of next hops. In this case it will be the transit switch IP.
 * RemoteCIDR - Specifies the list of remote CIDRs reachable via this gateway.
-
-This CR will be used by the RouteAgent pods running on the non-Gateway nodes to
 
 * In non-g/w node - If the route-agent pod is not in the same zone as Gateway node zone, send the traffic to the g/w node zone.
 * In g/w node - add route to send the traffic from other zones, destined to remote cluster to the submariner tunnel
@@ -131,19 +129,20 @@ traffic with in a cluster and will be present in every node.
 
 ### SubmarinerRouteAgentPod
 
-The Submariner Route-agent pod will be responsible for creating the SubmarinerGWRoute CR. It will be used only for OVN CNI. For every
-RemoteEndpointCreated event a SubmarinerGWRoute CR will be created. The nextHop will be the interface IP through which we can reach the cable
-driver. In the case of OVN it will be the IP of ovn-k8s-mp0 interface.
+The Submariner Route-agent pod running on the active gateway node will be responsible for creating the SubmarinerGWRoute CRs. It will be used
+only for OVN CNI. For every RemoteEndpointCreated event a SubmarinerGWRoute CR will be created. The nextHop will be the interface IP through
+which we can reach the cable driver. In the case of OVN it will be the IP of ovn-k8s-mp0 interface.
 
-The SubmarinerNonGWRoute CRD will also be created by Submariner Route-agent. It will have the list of remote endpoints connected to the gateway.
-The nextHop will be the transit switch IP of the G/W node. If the transit switch IP is missing this CRD will not be created, which means it is
-a non-IC setup.
+The SubmarinerNonGWRoute CRD will also be created by Submariner Route-agent. It will be created per endpoint and will have remoterCIDRS from
+the endpoint. The nextHop will be the transit switch IP of the G/W node. If the transit switch IP is missing this CRD will not be created,
+which means it is a non-IC setup.
 
-The RouteAgent  will have these controllers added to it and the one running in gateway node responds to the CRUD operations.
+The RouteAgent  will have these controllers added to it and the one running in gateway node responds to the CRUD operations of Submariner
+endpoints.
 
 #### SubmarinerGWRoute CR Controller
 
-This controller will be responsible for programming the OVN cluster router, it will react only in a g/w node. When a SubmarinerGWRoute
+This controller will be responsible for programming the OVN cluster router, it will react only the active g/w node. When a SubmarinerGWRoute
 CR is created or modified the controller shall create or update a routing policy in OVN cluster router with a priority of 20000, and it should
 redirect any traffic destined to remote CIDR to the ovn-k8s-mp0 interface IP.
 
@@ -159,29 +158,8 @@ policy              : []
 route_table         : ""
 ```
 
-#### SubmarinerNonGWRoute Controller
-
-This controller will run in every route agent pod. This controller connects to the OVN DB. When a SubmarinerNonGWRoute CR is created
-
-* non-gateway node : it updates the ovn-cluster-route with a router policy using a priority of 20000 to send the traffic to
-  the remote cluster via next hop mentioned, which is the transit switch IP to the g/w node. Before adding the route it checks if
-  a route exists, if so it skips adding the route again. This is required to prevent duplicate update since there can be more than
-  one node in each zone and hence more than one Routeagent.
-
-```bash
-_uuid               : 22db3005-64c5-4e32-aeb0-642423c30742
-action              : reroute
-external_ids        : {}
-match               : "ip4.dst==10.132.0.0/16"
-nexthop             : []
-nexthops            : ["169.254.0.1"]
-options             : {"external_ids:{submariner"="true}"}
-priority            : 20000
-```
-
-* gateway node/same zone node : Route agent running on the Gateway node, programs a route in the ovn-cluster-router, to route
-  the traffic coming from other zones destined to remote cluster IP range via the ovn-k8s-mp0 interface IP. It checks if the
-  rule already exists to prevent duplicate update.
+It also programs a route in the ovn-cluster-router, to route the traffic coming from other zones destined to remote cluster IP range via the
+ovn-k8s-mp0 interface IP.
 
 ```bash
 _uuid               : d55185d8-3732-45c1-ae90-4a7f8cd191f7
@@ -195,12 +173,37 @@ policy              : []
 route_table         : ""
 ```
 
+#### SubmarinerNonGWRoute Controller
+
+This controller will run in every route agent pod. This controller connects to the OVN DB. When a SubmarinerNonGWRoute CR is created
+in non-g/w node,  it updates the ovn-cluster-route with a router policy using a priority of 20000 to send the traffic to
+the remote cluster via next hop mentioned, which is the transit switch IP to the g/w node. Before adding the route it checks if
+a route exists, if so it skips adding the route again. This is required to prevent duplicate update since there can be more than
+one node in each zone and hence more than one RouteAgent.
+
+```bash
+_uuid               : 22db3005-64c5-4e32-aeb0-642423c30742
+action              : reroute
+external_ids        : {}
+match               : "ip4.dst==10.132.0.0/16"
+nexthop             : []
+nexthops            : ["169.254.0.1"]
+options             : {"external_ids:{submariner"="true}"}
+priority            : 20000
+```
+
 ### Backward Compatibility
 
 With this architecture, we are removing the logical switches and routers that Submariner created in the existing implementation.
 During migration, we will need to delete these components and the routes that network-plugin-syncer installed. After that,
 the new controllers shall install the updated routes. The operator needs to be updated as well, not to create a
 network-plugin-syncer pods and remove any existing deployments.
+
+### Gateway FailOver
+
+If there are two gateway nodes , the passive one will work like a non-gateway node. It will not be responsible for creating the CRs.
+In the case of gateway fail-over all the current SubmarinerGWRoute and SubmarinerNonGWRoute will be deleted by the route agent in
+the node that is transitioning to non-gateway node and will be recreated by the new gateway node.
 
 #### Open issues
 

@@ -56,8 +56,8 @@ our design and implementation should strive to complement them by adding support
 
 #### Pod IP Preservation
 
-For all practical applications of this solution, we would need to preserve the source IP in the packet.
-Either by avoiding any NAT on the source cluster, or by utilizing a solution such as an overlay network.
+For all practical applications of this solution, we would need to preserve the source IP in the packet 
+either by avoiding any NAT on the source cluster, or by utilizing a solution such as an overlay network.
 We would need to understand how this works with Globalnet v2 (if it's at all possible).
 
 ### Design Tenets
@@ -67,19 +67,19 @@ We would need to understand how this works with Globalnet v2 (if it's at all pos
 As we're running in the Submariner ecosystem, it makes sense to share any data we need to share via the broker.
 This has the following benefits (and more that aren't listed):
 
-* Debug-ability - users can see and query the data on the broker with ease to trace any problems.
+* Debuggability - users can see and query the data on the broker with ease to trace any problems.
 * Standardized clients - we have standardized Kubernetes clients generated, with all the common features (selectors, etc).
 * Integrated RBAC and authentication - Kubernetes takes care of this aspect for us as well.
 
 #### Connectivity Decoupling
 
-We should strive to decouple the design & implementation from the underlying connectivity,
-building on top of that fact that connectivity exists but not counting on it to be implemented in some certain way.
+We should strive to decouple the design and implementation from the underlying connectivity,
+building on top of the fact that connectivity exists but not counting on it to be implemented in some certain way.
 This would help our solution to be more robust and versatile.
 
 #### Solution Scope
 
-* We aim to solve the problem of having clusterset aware network policies.
+* We aim to solve the problem of having clusterset-aware network policies.
 * We're not trying to provide a revolutionary approach,
   but rather an evolutionary approach that expands the base Kubernetes network policy concept.
 * We aim for a good enough solution, but not a perfect solution encompassing every possible use case and edge case.
@@ -100,8 +100,8 @@ allowing the users to create the policy once, and the system will take care of d
 
 Each such policy will be translated by the local CoastGuard controller to one (or more) `NetworkPolicy` where:
 
-* Local peers are using the same selector.
-* Remote peers (pods) are identified using an `ipBlock` with a `\32` CIDR.
+* Local peers use the selector defined in the `ClusterSetNetworkPolicy` CR.
+* Remote peers (pods) are identified using an `ipBlock` with a `/32` CIDR.
 
 These local policies will be updated by the controller in response to any change in the original `ClusterSetNetworkPolicy` or any remote
 pod or namespace that are relevant to the policy.
@@ -187,7 +187,7 @@ The advantages of this proposal are:
 * A similar CRD structure would be more familiar to existing Kubernetes users.
 * Translating the structure to vanilla Kubernetes `NetworkPolicy` objects should be straightforward.
 * Not interfering with any existing vanilla `NetworkPolicy` resources.
-* The cluster's CNI takes carte of the actual implementation details of the policy enforcement.
+* The cluster's CNI takes care of the actual implementation details of the policy enforcement.
 * Under complete control of Submariner, rather than risking conflicts with other systems that might be managing these resources.
 * Ability to define additional clusterset-wide concerns in the CRD.
 

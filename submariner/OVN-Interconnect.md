@@ -65,7 +65,7 @@ point of time.
 
 This CR will be created when a remote endpoint is added and there will be one CR per remote cluster. This crd has two fields
 
-* NextHop - Specifies the next hop to reach the remote cluster, in this case it will be the IP of ovn-k8s-mp0
+* NextHops - Specifies the list of next hop to reach the remote cluster, in this case it will be the IP of ovn-k8s-mp0
   interface, the interface used by OVN for host networking.
 * RemoteCIDR - Specifies the list of  remote CIDRs reachable via this cluster.
 
@@ -81,8 +81,8 @@ type SubmarinerGwRoute struct {
 }
 
 type SubmarinerRoutePolicySpec struct {
-    //Specifies the next hop to reach the remote CIDRs
-    NextHop string `json:"nextHop"`
+    //Specifies the list of next hops to reach the remote CIDRs
+    NextHops []string `json:"nextHops"`
 
     //Specifies the remote CIDRs available via the next hop
     RemoteCidr []string `json:"remoteCidr"`
@@ -91,12 +91,12 @@ type SubmarinerRoutePolicySpec struct {
 
 #### SubmarinerNonGWRoute
 
-This CR will be created when a remote endpoint is created. When more remote endpoints are added the Remote CIDR list will be updated.
+This CR will be created when a remote endpoint is created and there will be one created endpoint.
 
-* NextHop - Specifies the next hop.
+* NextHops - Specifies the list of next hops. In this case it will be the transit switch IP.
 * RemoteCIDR - Specifies the list of remote CIDRs reachable via this gateway.
 
-This CR will be used by the Routeagent pods running on the non-Gateway nodes to
+This CR will be used by the RouteAgent pods running on the non-Gateway nodes to
 
 * In non-g/w node - If the route-agent pod is not in the same zone as Gateway node zone, send the traffic to the g/w node zone.
 * In g/w node - add route to send the traffic from other zones, destined to remote cluster to the submariner tunnel
@@ -110,8 +110,8 @@ type SubmarinerNonGWRoute struct {
 }
 
 type SubmarinerRoutePolicySpec struct {
-    //Specifies the next hop to reach the remote CIDRs
-    NextHop string `json:"nextHop"`
+    //Specifies the list of next hops to reach the remote CIDRs
+    NextHops []string `json:"nextHops"`
 
     //Specifies the remote CIDRs available via the next hop
     RemoteCidr []string `json:"remoteCidr"`
@@ -131,15 +131,15 @@ traffic with in a cluster and will be present in every node.
 
 ### SubmarinerRouteAgentPod
 
-The Submariner Route-agent pod will be responsible for creating the SubmarinerGWRoute CR. It will be used only for OVN CNI right now. For every
+The Submariner Route-agent pod will be responsible for creating the SubmarinerGWRoute CR. It will be used only for OVN CNI. For every
 RemoteEndpointCreated event a SubmarinerGWRoute CR will be created. The nextHop will be the interface IP through which we can reach the cable
 driver. In the case of OVN it will be the IP of ovn-k8s-mp0 interface.
 
 The SubmarinerNonGWRoute CRD will also be created by Submariner Route-agent. It will have the list of remote endpoints connected to the gateway.
-The nexthop will be the transit switch IP of the G/W node. If the transit switch IP is missing this CRD will not be created, which means it is
+The nextHop will be the transit switch IP of the G/W node. If the transit switch IP is missing this CRD will not be created, which means it is
 a non-IC setup.
 
-The Routeagent  will have these controllers added to it and the one running in gateway node responds to the CRUD operations.
+The RouteAgent  will have these controllers added to it and the one running in gateway node responds to the CRUD operations.
 
 #### SubmarinerGWRoute CR Controller
 
@@ -152,7 +152,7 @@ _uuid               : 0459f009-3603-47ac-8ee7-9d958540ed31
 bfd                 : []
 external_ids        : {}
 ip_prefix           : "10.132.0.0/16"
-nexthop             : "10.244.1.2"
+nexthop             : "10.1.1.2"
 options             : {}
 output_port         : []
 policy              : []
@@ -188,7 +188,7 @@ _uuid               : d55185d8-3732-45c1-ae90-4a7f8cd191f7
 bfd                 : []
 external_ids        : {}
 ip_prefix           : "10.132.0.0/16"
-nexthop             : "10.244.1.2"
+nexthop             : "10.1.1.2"
 options             : {}
 output_port         : []
 policy              : []

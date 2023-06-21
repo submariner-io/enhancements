@@ -13,12 +13,12 @@ jobs:
     steps:
       - name: Get PR commits
         id: 'get-pr-commits'
-        uses: tim-actions/get-pr-commits@c64db31d359214d244884dd68f971a110b29ab83
+        uses: tim-actions/get-pr-commits@3efc1387ead42029a0d488ab98f24b7452dc3cde
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 'Verify no "Apply suggestions from code review" commits'
-        uses: tim-actions/commit-message-checker-with-regex@d6d9770051dd6460679d1cab1dcaa8cffc5c2bbd
+        uses: tim-actions/commit-message-checker-with-regex@e16b08b1a7f5cafeb1f8167de05bf1d40239eb5d
         with:
           commits: ${{ steps.get-pr-commits.outputs.commits }}
           pattern: '^(?!.*(apply suggestions from code review))'
@@ -26,7 +26,7 @@ jobs:
           error: 'Commits addressing code review feedback should typically be squashed into the commits under review'
 
       - name: 'Verify no "fixup!" commits'
-        uses: tim-actions/commit-message-checker-with-regex@d6d9770051dd6460679d1cab1dcaa8cffc5c2bbd
+        uses: tim-actions/commit-message-checker-with-regex@e16b08b1a7f5cafeb1f8167de05bf1d40239eb5d
         with:
           commits: ${{ steps.get-pr-commits.outputs.commits }}
           pattern: '^(?!fixup!)'
@@ -38,10 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
 
       - name: Run markdown-link-check
-        uses: gaurav-nelson/github-action-markdown-link-check@4d97ad89bbb0de4be573a9d7a2fc0ce900afc519
+        uses: gaurav-nelson/github-action-markdown-link-check@228fbf4ffb2a86a65314866e9b2322b519fd885f
         with:
           config-file: ".markdownlinkcheck.json"
           check-modified-files-only: "yes"
@@ -52,9 +52,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
       - name: Run markdownlint
-        uses: nosborn/github-action-markdown-cli@5cfe13755d7cdc2d0d01b69c7900cfd3fa37f4a4
+        uses: nosborn/github-action-markdown-cli@9b5e871c11cc0649c5ac2526af22e23525fa344d
         with:
           files: .
           config_file: ".markdownlint.yml"
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
       - name: Run yamllint
         uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c
         with:

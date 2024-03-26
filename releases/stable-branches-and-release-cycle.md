@@ -20,10 +20,10 @@ are simply `<image>:<branch-or-tag>`.
 
 Approaching the first release candidate `rc0` of every minor or major version, a new stable
 branch will be forked off `devel` branch in the form of `release-x.y` by the release scripts,
-and a patch or PR pinning the shipyard-base-image to `release-x.y` will be applied by the
+and a patch or PR pinning the `shipyard-base-image` to `release-x.y` will be applied by the
 automated process.
 
-Any following changes related to pinning go modules in submariner, admiral, lighthouse, etc...
+Any following changes related to pinning go modules in Submariner, Admiral, Lighthouse, etc...
 will be done in the `release-x.y` branch directly (no cherry picks).
 
 Once the branch exists, any patches which should be part of the release will need to be
@@ -93,8 +93,8 @@ for example
 * `0.9-milestone-3-rc0`, ... , `0.9-milestone-3`
 * `0.9-milestone-4-rc0`, ... , `0.9-milestone-4`
 
-In this case we won't do pinning of shipyard base image, but we will release and update
-the admiral & shipyard `go.mod` git references, without pinning shipyard.
+In this case we won't do pinning of Shipyard base image, but we will release and update
+the Admiral & Shipyard `go.mod` git references, without pinning Shipyard.
 
 After a number of milestones instead we would follow the usual pattern for a release:
 

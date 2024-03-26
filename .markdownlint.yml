@@ -10,3 +10,24 @@ line-length:
 no-inline-html:
   allowed_elements:
     - span
+
+# Enforce our capitalisation rules (where they're unambiguous)
+# Terms listed here should also be listed in the style guide
+# https://submariner.io/development/website/style-guide/#submarinerio-word-list
+spelling:
+  names:
+    - Admiral
+    - ClusterSet
+    - Coastguard
+    - Globalnet
+    - IPsec
+    - iptables
+    - kind
+    - Kubernetes
+    - Lighthouse
+    - OpenStack
+    - Shipyard
+    - subctl
+    - Submariner
+    - VXLAN
+  code_blocks: false

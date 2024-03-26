@@ -7,13 +7,13 @@ On private connections, it would be useful to allow unencrypted connections, for
 
 ## Proposal
 
-This enhancement proposes to use VXLAN for un-encrypted connection between clusters. A new VXLAN interface "vxlan-tunnel"
+This enhancement proposes to use VXLAN for un-encrypted connection between clusters. A new VXLAN interface `vxlan-tunnel`
 will be added to the active gateway node of each cluster and it will act as the VTEP. The traffic which is destined to other
 clusters will be forwarded via this interface to the appropriate clusters.
 
 ## Design Details
 
-* A new interface "vxlan-tunnel" will be added.
+* A new interface `vxlan-tunnel` will be added.
 * The VXLAN interface will be one-to-many, that is a single interface will be used to connect to all the joined clusters.
 * For the VXLAN VTEP IP, the prefix "241" will be used, followed by the rest of the blocks from the endpoint private IP address. For example,
 if the private IP address is 10.2.96.1 the VTEP IP would be 241.2.96.1.

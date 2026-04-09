@@ -1,3 +1,13 @@
+---
+sep: 21
+title: "IPSec Certificate Support"
+status: done
+authors: []
+created: ""
+components: [submariner, subctl]
+repos: []
+---
+
 # Submariner Enhancement Proposal: Certificate Mode for OVN-Kubernetes IPsec
 
 ## Summary

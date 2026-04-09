@@ -1,3 +1,13 @@
+---
+sep: 8
+title: "Show Versions from Logs"
+status: done
+authors: []
+created: ""
+components: [subctl, submariner, lighthouse]
+repos: []
+---
+
 # Extract version information from pod logs
 
 Related issue:

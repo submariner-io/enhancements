@@ -1,3 +1,13 @@
+---
+sep: 7
+title: "Disable Features in Build"
+status: done
+authors: []
+created: ""
+components: [subctl]
+repos: []
+---
+
 # Disable certain features while building `subctl`
 
 Related Issue:

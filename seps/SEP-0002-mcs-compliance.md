@@ -1,3 +1,13 @@
+---
+sep: 2
+title: "MCS Compliance"
+status: done
+authors: []
+created: ""
+components: [lighthouse, submariner, submariner-operator, subctl]
+repos: []
+---
+
 # Add support for 100% MCS compliance
 
 Related issue:

@@ -1,3 +1,13 @@
+---
+sep: 30
+title: "Built-in Benchmarking Tool"
+status: done
+authors: []
+created: ""
+components: [subctl]
+repos: []
+---
+
 ## Add Built-in Benchmarking Tool
 
 [submariner-operator#494](https://github.com/submariner-io/submariner-operator/issues/494)

@@ -1,3 +1,13 @@
+---
+sep: 3
+title: "SRV Records"
+status: done
+authors: []
+created: ""
+components: [lighthouse]
+repos: []
+---
+
 # SRV records in Lighthouse
 
 ## Summary

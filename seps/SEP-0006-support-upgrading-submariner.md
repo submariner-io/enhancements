@@ -1,3 +1,13 @@
+---
+sep: 6
+title: "Support Upgrading Submariner"
+status: done
+authors: []
+created: ""
+components: [subctl]
+repos: []
+---
+
 # Adding command to subctl to upgrade Submariner
 
 Related Issue: [Add subctl upgrade command](https://github.com/submariner-io/enhancements/issues/183)

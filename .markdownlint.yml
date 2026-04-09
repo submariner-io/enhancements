@@ -2,6 +2,9 @@
 # Breaks reusing MD snippets extracted to files
 first-line-heading: false
 
+# Frontmatter title acts as document title
+single-h1: false
+
 # Set maximum line Length to 140c to match Go linting
 line-length:
   line_length: 140

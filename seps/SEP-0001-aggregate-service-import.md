@@ -1,3 +1,13 @@
+---
+sep: 1
+title: "Aggregate ServiceImport"
+status: deferred
+authors: []
+created: ""
+components: [lighthouse]
+repos: []
+---
+
 # Aggregate Service Import for Lighthouse
 
 ## Status

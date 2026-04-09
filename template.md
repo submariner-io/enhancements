@@ -1,3 +1,13 @@
+---
+sep: NNNN
+title: ""
+status: draft
+authors: []
+created: YYYY-MM-DD
+components: []
+repos: []
+---
+
 # Title of the enhancement proposal
 
 <!-- Add link to issue/epic if available -->
@@ -6,33 +16,43 @@
 
 <!-- Add brief summary of enhancement proposal. -->
 
-## Proposal
+## Motivation
 
-<!-- Detailed information about the enhancement proposal. Add any subsections if needed. -->
+<!-- Why is this change needed? What problem does it solve? -->
 
-## Design Details
+## Design
 
-<!-- Detailed design of the proposal. This should include any yamls, CRDs, data structures, APIs etc. Add/remove any subsections
-if needed -->
+<!-- Technical approach: APIs, CRDs, data structures, architecture.
+     Include diagrams, Go structs, YAML examples as needed. -->
 
-### Pros
-<!-- Benefits of going with this proposal  -->
+### Alternatives Considered
 
-### Cons
-<!-- Drawbacks of going with this proposal. -->
+<!-- Other approaches evaluated and why this one was chosen. -->
 
 ### Backward Compatibility
 
-<!-- Any backward compatibility concerns -->
+<!-- Any backward compatibility concerns. -->
 
-### Alternatives
+## Implementation Plan
 
-<!-- Any alternatives to consider with pros and cons, if applicable. -->
+<!-- Optional. Step-by-step guidance for implementing this proposal.
+     Include file paths, code changes, and commands where helpful.
+     Useful for both human contributors and AI agents. -->
 
-## External Dependencies
+### Step 1: [Name]
 
-<!-- Any external dependencies this proposal may have -->
+**Files:** `path/to/file.go`
 
-## User Impact
+<!-- What to change and why. -->
 
-<!-- Optional. Any impact on users this change may have. -->
+## Done When
+
+<!-- Optional. How to verify the proposal has been fully implemented.
+     Include executable commands where possible. -->
+
+```bash
+make test
+# Feature-specific verification
+```
+
+- [ ] Manual verification checklist items

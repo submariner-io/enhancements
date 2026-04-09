@@ -1,3 +1,13 @@
+---
+sep: 24
+title: "IPv6 Datapath"
+status: done
+authors: []
+created: ""
+components: [submariner]
+repos: []
+---
+
 # Submariner Enhancement for IPV6 datapath
 
 <!-- Add link to issue/epic if available -->

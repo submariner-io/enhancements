@@ -1,3 +1,13 @@
+---
+sep: 16
+title: "Metrics Redesign"
+status: done
+authors: []
+created: ""
+components: [submariner-operator]
+repos: []
+---
+
 # Submariner metrics redesign
 
 Related Issue:

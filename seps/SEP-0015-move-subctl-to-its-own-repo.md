@@ -1,3 +1,13 @@
+---
+sep: 15
+title: "Move Subctl to its Own Repo"
+status: done
+authors: []
+created: ""
+components: [submariner-operator, subctl]
+repos: []
+---
+
 # Move `subctl` to its own repository
 
 ## Summary

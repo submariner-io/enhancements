@@ -1,3 +1,13 @@
+---
+sep: 12
+title: "Subctl Info Status"
+status: done
+authors: []
+created: ""
+components: [submariner-operator, subctl]
+repos: []
+---
+
 # Add more capabilities to check status from subctl
 
 [submariner-operator#359](https://github.com/submariner-io/submariner-operator/issues/359)

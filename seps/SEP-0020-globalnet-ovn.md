@@ -1,3 +1,13 @@
+---
+sep: 20
+title: "Globalnet OVN"
+status: done
+authors: []
+created: ""
+components: [submariner]
+repos: []
+---
+
 # Globalnet support for OVN-Kubernetes CNI
 
 Related Issue:

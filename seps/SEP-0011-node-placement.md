@@ -1,3 +1,13 @@
+---
+sep: 11
+title: "Node Placement"
+status: done
+authors: []
+created: ""
+components: [submariner-operator]
+repos: []
+---
+
 # Node Placement
 
 [Add support for nodeSelector and toleration scheduling for submariner pods](https://github.com/submariner-io/enhancements/issues/149)

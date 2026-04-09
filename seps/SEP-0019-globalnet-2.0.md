@@ -1,3 +1,13 @@
+---
+sep: 19
+title: "Globalnet 2.0"
+status: done
+authors: []
+created: ""
+components: [submariner, submariner-operator]
+repos: []
+---
+
 ## Globalnet 2.0: Enhancements to Globalnet Implementation
 
 ## Summary

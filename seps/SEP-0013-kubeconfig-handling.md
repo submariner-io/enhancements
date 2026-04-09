@@ -1,3 +1,13 @@
+---
+sep: 13
+title: "Kubeconfig Handling"
+status: done
+authors: []
+created: ""
+components: [submariner-operator]
+repos: []
+---
+
 ## Epic Description
 
 The various `subctl` commands support a mixture of `KUBECONFIG` environment variables, `--kubeconfig` flags, `--kubecontext` flags,

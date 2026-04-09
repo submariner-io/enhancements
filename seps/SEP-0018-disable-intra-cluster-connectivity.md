@@ -1,3 +1,13 @@
+---
+sep: 18
+title: "Disable Intra-Cluster Connectivity"
+status: done
+authors: []
+created: ""
+components: [submariner]
+repos: []
+---
+
 # Disable Intra-cluster Connectivity
 
 ## Overview

@@ -1,3 +1,13 @@
+---
+sep: 14
+title: "Operator Rework"
+status: done
+authors: []
+created: ""
+components: [submariner-operator]
+repos: []
+---
+
 ## Epic Description
 
 The operator was built using an old version of the

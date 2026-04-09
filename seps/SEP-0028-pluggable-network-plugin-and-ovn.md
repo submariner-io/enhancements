@@ -1,3 +1,13 @@
+---
+sep: 28
+title: "Pluggable Network Plugin and OVN"
+status: done
+authors: []
+created: ""
+components: [submariner, submariner-operator]
+repos: []
+---
+
 ## Add support for OVN with pluggable network-plugin support
 
 [submariner#778](https://github.com/submariner-io/submariner/issues/778)

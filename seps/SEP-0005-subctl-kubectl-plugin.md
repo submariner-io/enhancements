@@ -1,3 +1,13 @@
+---
+sep: 5
+title: "Subctl as kubectl Plugin"
+status: done
+authors: []
+created: ""
+components: [subctl]
+repos: []
+---
+
 # Support Krew way of installing `subctl`
 
 Related Issue:

@@ -1,3 +1,13 @@
+---
+sep: 10
+title: "Diagnose Refactor OCM"
+status: done
+authors: []
+created: ""
+components: [submariner-operator, subctl]
+repos: []
+---
+
 # Refactor subctl diagonose for use with OCM
 
 ## Summary
